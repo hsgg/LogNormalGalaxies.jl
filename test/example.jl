@@ -1,15 +1,8 @@
 #!/usr/bin/env julia
 
-using Distributed
+using Revise
 
-@everywhere include("$(ENV["HOME"])/hgebhardt-postdoc/src/include.jl")
-
-# configure MPI
-ENV["JULIA_MPI_BINARY"] = "system"
-using Pkg
-Pkg.build("MPI", verbose=true)
-
-@everywhere module test_lognormal
+module test_lognormal
 
 using LogNormalGalaxies
 using LogNormalGalaxies.Splines
