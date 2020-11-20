@@ -390,7 +390,6 @@ function simulate_galaxies(nxyz, Lxyz, Ngalaxies, pk, kF, Δx, b, faH, rfftplan=
     println("Draw random phases...")
     deltak_phases = draw_phases(rfftplan)
     @show get_rank(),deltak_phases[1,1,1],mean(deltak_phases)
-    return
     println("Calculate kmode...")
     @time kmode = calc_kmode(nx, ny, nz, kF, pencil(deltak_phases))
     @show get_rank(),kmode[1,1,1],mean(kmode)
@@ -513,7 +512,7 @@ function simulate_galaxies(nbar, Lbox, pk; nmesh=256, bias=1.0, f=0.0,
     nxyz = n, n, n
     Lxyz = L, L, L
     @time xyzv = simulate_galaxies(nxyz, Lxyz, Ngalaxies, pk, kF, Δx, b, f)
-                                   #lagrangian=lagrangian)
+    @show size(xyzv)
     xyz = @. xyzv[1:3,:] - Float32(L / 2)
     v = xyzv[4:6,:]
     return xyz, v
