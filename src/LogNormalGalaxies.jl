@@ -410,9 +410,9 @@ function simulate_galaxies(nxyz, Lxyz, Ngalaxies, pk, kF, Δx, b, faH, rfftplan=
     @show get_rank(),"interim",deltarg[1,1,1],mean(deltakg)
     @time @. deltarm *= (nx*ny*nz) / Volume
     @time @. deltarg *= (nx*ny*nz) / Volume
-    deltakg = nothing
     @show get_rank(),deltarm[1,1,1],mean(deltakm)
     @show get_rank(),deltarg[1,1,1],mean(deltakg)
+    deltakg = nothing
     @show mean(deltarm),std(deltarm)
     @show extrema(deltarm)
     @show mean(deltarg),std(deltarg)
