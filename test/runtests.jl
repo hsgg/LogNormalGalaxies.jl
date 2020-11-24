@@ -58,7 +58,17 @@ function test_random_phases()
 end
 
 
+function test_pk_to_pkG()
+    data = readdlm((@__DIR__)*"/rockstar_matterpower.dat", comments=true)
+    pk = Spline1D(data[:,1], data[:,2], extrapolation=Splines.powerlaw)
+    k, pkG = LogNormalGalaxies.pk_to_pkG(pk)
+    @show pkG.(k[1:20])
+    @test pkG(0) == 0
+end
+
+
 function main()
+    test_pk_to_pkG()
     @test compile_and_load()
     test_random_phases()
 end

@@ -472,6 +472,9 @@ function simulate_galaxies(nxyz, Lxyz, Ngalaxies, pk, kF, Δx, b, faH; rfftplan=
     kGm, pkGm = pk_to_pkG(pk)
     kGg, pkGg = pk_to_pkG(k -> b^2 * pk(k))
 
+    @show pkGm.([0.0,1.0])
+    @show pkGg.([0.0,1.0])
+
     println("Draw random phases...")
     deltak_phases = draw_phases(rfftplan)
     @show get_rank(),deltak_phases[1,1,1],mean(deltak_phases)
@@ -482,6 +485,8 @@ function simulate_galaxies(nxyz, Lxyz, Ngalaxies, pk, kF, Δx, b, faH; rfftplan=
     println("Calculate deltak{m,g}...")
     @time deltakm = deepcopy(deltak_phases)
     @time deltakg = deltak_phases
+    @show get_rank(),deltakm[1,1,1],mean(deltakm)
+    @show get_rank(),deltakg[1,1,1],mean(deltakg)
     @time @. deltakm *= √(pkGm(kmode) * Volume)
     @time @. deltakg *= √(pkGg(kmode) * Volume)
     deltak_phases = nothing
