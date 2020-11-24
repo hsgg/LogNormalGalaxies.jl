@@ -12,7 +12,6 @@ export simulate_galaxies,
        read_galaxies,
        write_galaxies
 
-
 #using PkSpectra
 #using Cosmologies
 
@@ -30,20 +29,22 @@ using Random
 
 using .Splines
 
-#using QuadOsc
+using QuadOsc
 #using QuadGK
+
+#using PyPlot
 
 
 j0(x) = sinc(x/π)
 
 
-#function xicalc00_quadosc(fn, r)
-#    I,E = quadosc(k -> k^2 * fn(k) * j0(k*r), 0, Inf, n->π*n/r)
-#    #I,E = quadgk(k -> k^2 * fn(k) * j0(k*r), 0, Inf)
-#    I,E = (I,E) ./ (2 * π^2)
-#    @show r,I
-#    return I
-#end
+function xicalc00_quadosc(fn, r)
+    I,E = quadosc(k -> k^2 * fn(k) * j0(k*r), 0, Inf, n->π*n/r)
+    #I,E = quadgk(k -> k^2 * fn(k) * j0(k*r), 0, Inf)
+    I,E = (I,E) ./ (2 * π^2)
+    #@show r,I
+    return I
+end
 
 
 # PencilFFTs.jl needs 'allocate_input()', but FFTW doesn't provide it:
@@ -184,15 +185,22 @@ end
 
 #################### calculate P_G(k) ###########################
 function pk_to_pkG(pkfn)
-    r, xi = xicalc(pkfn, 0, 0; kmin=1e-10, kmax=1e10, r0=1e-5, N=2^15, q=2.0)
+    ## Notes: xicalc is fast here, quadosc is too slow for large r. However,
+    ## xicalc has some noise at large r. Therefore, later we need to use
+    ## quadosc as it is more robust in dealing with that noise.
+
+    r1, xi1 = xicalc(pkfn, 0, 0; kmin=1e-10, kmax=1e10, r0=1e-5, N=2^15, q=2.0)
     #r2, xi2 = xicalc(pkfn, 0, 0; kmin=1e-25, kmax=1e25, r0=1e-25, N=4096, q=2.0)
-    #r3 = range(0.001, 1e3, length=10000)
+    #r3 = 10.0 .^ range(-4, 3.7, length=1000)
     #xi3 = xicalc00_quadosc.(pkfn, r3)
+
+    r, xi = r1, xi1
+
     #close("all")
 
     #figure()
-    #plot(r,xi, "b", label=L"\xi(r)")
-    #plot(r,-xi, "b--")
+    #plot(r1,xi1, "b", label=L"\xi(r)")
+    #plot(r1,-xi1, "b--")
     #plot(r3,xi3, "g", label=L"\xi(r)")
     #plot(r3,-xi3, "g--")
     #xscale("log")
@@ -231,60 +239,22 @@ function pk_to_pkG(pkfn)
     #xlabel(L"r")
     #legend()
 
-    #dlnr = log(r[3]/r[2])
-    #pk_0 = 4π*sum(xi.*r.^3)*dlnr
-    #pk_0² = 4π*sum(xi.^2 .* r.^3)*dlnr
-    #pk_0³ = 4π*sum(xi.^3 .* r.^3)*dlnr
-    #pk_0⁴ = 4π*sum(xi.^4 .* r.^3)*dlnr
-    #@show pk_0 pk_0²/2 pk_0³/3 pk_0⁴/4
-    #pkG_0 = 4π*sum(xiG.*r.^3)*dlnr
-    #@show pkG_0
-
-    #dlnr = log(r2[3]/r2[2])
-    #pk_0 = 4π*sum(xi2.*r2.^3)*dlnr
-    #pk_0² = 4π*sum(xi2.^2 .* r2.^3)*dlnr
-    #pk_0³ = 4π*sum(xi2.^3 .* r2.^3)*dlnr
-    #pk_0⁴ = 4π*sum(xi2.^4 .* r2.^3)*dlnr
-    #@show pk_0 pk_0²/2 pk_0³/3 pk_0⁴/4
-    #pkG_0 = 4π*sum(xiG2.*r2.^3)*dlnr
-    #@show pkG_0
-
-    #return r, xi
-
-    #k, pk2 = xicalc((r,xi), 0, 0; r0=1/maximum(r), q=0.7)
-    #k, pk3 = xicalc((r,xi), 0, 0; r0=1/maximum(r), q=0.8)
-    #pk2 .*= (2π)^3
-    #pk3 .*= (2π)^3
-    #figure()
-    #plot(k, pkfn.(k), "k", label=L"input $P(k)$")
-    #plot(k, pk2, "b", label=L"round-trip $P(k)$")
-    #plot(k, -pk2, "b--")
-    #plot(k, pk3, "g", label=L"round-trip $P(k)$")
-    #plot(k, -pk3, "g--")
-    #xscale("log")
-    #yscale("log")
-    ##ylim(1e-10, 1e5)
-    #legend()
-
-    #kln = readdlm("$root/data/fog_r1000_pkG.dat")[:,1]
-    #pkGln = readdlm("$root/data/fog_r1000_pkG.dat")[:,2]
-
-    #k, pkG = xicalc((r,xiG), 0, 0; r0=1/maximum(r), q=1.5)
-    k, pkG = xicalc(xiGfn, 0, 0; kmin=1e-10, kmax=1e10, r0=1e-10, N=2^18, q=1.5)
+    #k1, pkG1 = xicalc(xiGfn, 0, 0; kmin=1e-10, kmax=1e10, r0=1e-10, N=2^18, q=1.5)
     #k2, pkG2 = xicalc(xiGfn, 0, 0; kmin=1e-10, kmax=1e10, r0=1e-5, N=2^18, q=1.5)
-    #k3 = 10.0 .^ range(-5, 1, length=100)
-    #pkG3 = xicalc00_quadosc.(xiG3fn, k3)
-    pkG .*= (2π)^3
+    k3 = 10.0 .^ range(-5, 2, length=200)
+    pkG3 = xicalc00_quadosc.(xiGfn, k3)
+    #pkG1 .*= (2π)^3
     #pkG2 .*= (2π)^3
-    #pkG3 .*= (2π)^3
+    pkG3 .*= (2π)^3
+
+    k, pkG = k3, pkG3
+
     #figure()
-    ##plot(kln, pkGln, "k", lw=3, label=L"DJ's $P_G(k)$")
-    ##plot(kln, -pkGln, "k--", lw=3)
     #plot(k, pkfn.(k), "k", L"P(k)")
-    #plot(k,pkG, "b", label=L"$P_G(k)$")
-    #plot(k,-pkG, "b--")
-    #plot(k2,pkG2, "g", label=L"$P_G(k)$")
-    #plot(k2,-pkG2, "g--")
+    #plot(k1,pkG1, "b", label=L"$P_G(k)$")
+    #plot(k1,-pkG1, "b--")
+    ##plot(k2,pkG2, "g", label=L"$P_G(k)$")
+    ##plot(k2,-pkG2, "g--")
     #plot(k3,pkG3, "r", label=L"$P_G(k)$")
     #plot(k3,-pkG3, "r--")
     #xscale("log")
@@ -292,24 +262,21 @@ function pk_to_pkG(pkfn)
     ##ylim(1e-14, 1e5)
     #legend()
 
+    @show k[1], pkG[1]
+
     # the extremes lead to overflow
     sel = @. (pkG > 0)
     k = k[sel][3:end-2]
     pkG = pkG[sel][3:end-2]
+    @show k[1], pkG[1]
 
-    sel = @. 1e-3 <= k <= 1e2
+    sel = @. 1e-5 <= k <= 1e2
     k = k[sel]
     pkG = pkG[sel]
+    @show k[1], pkG[1]
 
-    #pkGfn = PkSpectrum(k, pkG)
     pkGfn = Spline1D(k, pkG, extrapolation=Splines.powerlaw)
-    #@show pkGfn.kmin
-    #@show pkGfn.kmax
-    #@show pkGfn.nslo
-    #@show pkGfn.nshi
-    #@show pkGfn.kmin_norm
-    #@show pkGfn.kmax_norm
-    #@show pkGfn.kmax_a
+    @show pkGfn.([0.0, 1e-4])
     return k, pkGfn
 end
 
