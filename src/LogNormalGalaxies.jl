@@ -113,7 +113,8 @@ end
 
 
 function get_rank(comm=MPI.COMM_WORLD)
-    rank = MPI.Comm_rank(comm)
+    MPI.Initialized() || return 0
+    return MPI.Comm_rank(comm)
 end
 
 
@@ -442,12 +443,14 @@ function var_global(arr, comm=MPI.COMM_WORLD)
     n = length(arr)
     μ = mean(arr)
     v = var(arr)
-    nn = MPI.Allgather(n, comm)
-    μμ = MPI.Allgather(μ, comm)
-    vv = MPI.Allgather(v, comm)
-    n = sum(nn)
-    μ = sum(@. nn / n * μμ)
-    v = sum(@. (nn - 1) / (n - 1) * vv + nn / (n - 1) * (μμ - μ)^2)
+    if MPI.Initialized()
+        nn = MPI.Allgather(n, comm)
+        μμ = MPI.Allgather(μ, comm)
+        vv = MPI.Allgather(v, comm)
+        n = sum(nn)
+        μ = sum(@. nn / n * μμ)
+        v = sum(@. (nn - 1) / (n - 1) * vv + nn / (n - 1) * (μμ - μ)^2)
+    end
     return v
 end
 
