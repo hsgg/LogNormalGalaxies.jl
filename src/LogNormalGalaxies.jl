@@ -54,7 +54,7 @@ end
 
 
 function plan_with_fftw(nxyz)
-    return plan_rfft(Array{Float64}(undef, nxyz))
+    return plan_rfft(Array{Float64}(undef, nxyz...))
 end
 
 function plan_with_pencilffts(nxyz)
@@ -64,7 +64,7 @@ function plan_with_pencilffts(nxyz)
     transform = Transforms.RFFT()
     @show proc_dims
 
-    @time rfftplan = PencilFFTPlan(nxyz, transform, proc_dims, comm)
+    @time rfftplan = PencilFFTPlan((nxyz...,), transform, proc_dims, comm)
     return rfftplan
 end
 
@@ -318,8 +318,9 @@ end
 
 function draw_phases(rfftplan)
     deltar = allocate_input(rfftplan)
-    randn!(deltar)
-    @show mean(deltar)
+    @show size(deltar),length(deltar)
+    randn!(parent(deltar))
+    @show mean(deltar),var_global(deltar)
     @assert !isnan(mean(deltar))
 
     @time deltak_phases = rfftplan * deltar
