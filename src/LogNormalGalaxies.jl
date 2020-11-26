@@ -101,6 +101,8 @@ end
 
 PencilFFTs.size_global(arr::AbstractArray) = size(arr)
 
+PencilFFTs.sizeof_global(arr::AbstractArray) = sizeof(arr)
+
 
 ############## MPI stuff ###########33
 
@@ -297,6 +299,8 @@ function draw_phases(rfftplan)
     @time @. deltak_phases /= abs(deltak_phases)
     @show mean(deltak_phases)
     @assert !isnan(mean(deltak_phases))
+    @show sizeof_global(deltak_phases)/1024^3
+    @show sizeof(rfftplan)
     return deltak_phases
 end
 
