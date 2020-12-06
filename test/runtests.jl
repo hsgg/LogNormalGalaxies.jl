@@ -30,7 +30,10 @@ function compile_and_load()
     x⃗2, Ψ2 = simulate_galaxies(nbar, L+ΔL, pk; nmesh=n, bias=b, f=1, rfftplanner=LogNormalGalaxies.plan_with_pencilffts)
     @show size(x⃗), size(Ψ)
     @show size(x⃗2), size(Ψ2)
-    return true
+    @test typeof(x⃗) <: Array{Float32}
+    @test typeof(Ψ) <: Array{Float32}
+    @test typeof(x⃗2) <: Array{Float32}
+    @test typeof(Ψ2) <: Array{Float32}
 end
 
 
@@ -73,7 +76,7 @@ end
 function main()
     test_pk_to_pkG(0.1)
     test_pk_to_pkG(1.0)
-    @test compile_and_load()
+    compile_and_load()
     test_random_phases()
 end
 
