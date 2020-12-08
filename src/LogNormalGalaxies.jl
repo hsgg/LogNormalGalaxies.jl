@@ -8,12 +8,9 @@
 module LogNormalGalaxies
 
 export simulate_galaxies,
-       simulate_galaxies_mpi,
        read_galaxies,
        write_galaxies
 
-#using PkSpectra
-#using Cosmologies
 
 include("Splines.jl")
 
@@ -539,40 +536,6 @@ function simulate_galaxies(nbar, Lbox, pk; nmesh=256, bias=1.0, f=0.0,
     v = xyzv[4:6,:]
     return xyz, v
 end
-
-
-# obsolete:
-function simulate_galaxies_mpi(dname::AbstractString, nxyz, Lxyz, Ngalaxies,
-                           pk, kF, Δx, b, faH)
-    rank, comm = start_mpi()
-
-    #rfftplan = plan_with_fftw(nxyz)
-    rfftplan = plan_with_pencilffts(nxyz)
-    #rfftplan = default_plan(nxyz)
-
-    xyzv = simulate_galaxies(nxyz, Lxyz, Ngalaxies, pk, kF, Δx, b, faH, rfftplan)
-    mkpath(dname)
-    fname = @sprintf("%s/%04d.bin", dname, rank)
-    @time write_galaxies(fname, Lxyz, xyzv)
-
-    println("Saving all galaxies in one big file...")
-    @time Ngalaxies = MPI.Reduce(size(xyzv,2), +, 0, comm)
-    if rank == 0
-        @time open("$dname.bin", "w") do fout
-            write(fout, Array{Float64}(collect(Lxyz)))
-            write(fout, Int64(Ngalaxies))
-            @time write(fout, Array{Float32}(xyzv))  # rank = 0
-            for r=1:MPI.Comm_size(comm)-1  # rank=1:end
-                fname = @sprintf("%s/%04d.bin", dname, r)
-                @time LLL, xyzv = read_galaxies(fname)
-                @time write(fout, Array{Float32}(xyzv))
-            end
-        end
-    end
-
-    return rank
-end
-
 
 
 end
