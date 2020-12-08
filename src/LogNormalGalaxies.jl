@@ -32,6 +32,14 @@ using QuadOsc
 #using PyPlot
 
 
+estimate_memory(N::Integer) = estimate_memory([N,N,N])
+function estimate_memory(nxyz::Array)
+    nfloats = 9 * prod(nxyz)
+    memory = nfloats * sizeof(Float64)
+    return memory
+end
+
+
 j0(x) = sinc(x/π)
 
 
