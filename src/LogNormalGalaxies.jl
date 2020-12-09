@@ -156,10 +156,10 @@ function concatenate_mpi_arr(x::AbstractVector, T=Float32, comm=MPI.COMM_WORLD)
 end
 
 function concatenate_mpi_arr(x, T=Float32, comm=MPI.COMM_WORLD)
-    n1 = size(x,1)
+    shape = size(x)
     x = reshape(x, :)
     x = concatenate_mpi_arr(x, T, comm)
-    return reshape(x, n1, :)
+    return reshape(x, shape[1:end-1]..., :)
 end
 
 
