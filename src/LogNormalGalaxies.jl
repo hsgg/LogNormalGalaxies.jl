@@ -363,13 +363,17 @@ end
 
 ##################### draw galaxies ###########################
 function draw_galaxies_with_velocities(deltar, vx, vy, vz, Ngalaxies, Δx=1.0)
+    T = Float32
+    rsd = !(vx == vy == vz == 0)
     nx, ny, nz = size_global(deltar)
     Navg = Ngalaxies / (nx * ny * nz)
-    xyzv = Float32[]
+    xyzv = T[]
     deltar_global = global_view(deltar)
-    vx_global = global_view(vx)
-    vy_global = global_view(vy)
-    vz_global = global_view(vz)
+    if rsd
+        vx_global = global_view(vx)
+        vy_global = global_view(vy)
+        vz_global = global_view(vz)
+    end
     localrange = range_local(deltar)
     @time for k=localrange[3], j=localrange[2], i=localrange[1]
         Nthiscell = pois_rand((1 + deltar_global[i,j,k]) * Navg)
@@ -380,9 +384,15 @@ function draw_galaxies_with_velocities(deltar, vx, vy, vz, Ngalaxies, Δx=1.0)
             push!(xyzv, x*Δx)
             push!(xyzv, y*Δx)
             push!(xyzv, z*Δx)
-            push!(xyzv, vx_global[i,j,k])
-            push!(xyzv, vy_global[i,j,k])
-            push!(xyzv, vz_global[i,j,k])
+            if rsd
+                push!(xyzv, vx_global[i,j,k])
+                push!(xyzv, vy_global[i,j,k])
+                push!(xyzv, vz_global[i,j,k])
+            else
+                push!(xyzv, T(0))
+                push!(xyzv, T(0))
+                push!(xyzv, T(0))
+            end
         end
     end
     @time xyzv_out = reshape(xyzv, 6, :)
@@ -518,26 +528,29 @@ function simulate_galaxies(nxyz, Lxyz, Ngalaxies, pk, kF, Δx, b, faH; rfftplan=
     @show extrema(deltarg)
 
     # calculate velocity field
-    println("Calculate deltakm...")
-    @time deltakm = rfftplan * deltarm
-    @time @. deltakm *= Volume / (nx*ny*nz)
-    deltarm = nothing
-    println("Calculate v⃗(k⃗)...")
-    @time vkx, vky, vkz = calculate_velocities_faH(deltakm, kF)
-    deltakm = nothing  # free memory
-    println("Calculate v⃗(r⃗)...")
-    @time vx = rfftplan \ vkx
-    @time @. vx *= faH * (nx*ny*nz) / Volume
-    vkx = nothing  # free memory
-    @time vy = rfftplan \ vky
-    @time @. vy *= faH * (nx*ny*nz) / Volume
-    vky = nothing  # free memory
-    @time vz = rfftplan \ vkz
-    @time @. vz *= faH * (nx*ny*nz) / Volume
-    vkz = nothing  # free memory
+    if faH != 0
+        println("Calculate deltakm...")
+        @time deltakm = rfftplan * deltarm
+        @time @. deltakm *= Volume / (nx*ny*nz)
+        deltarm = nothing
+        println("Calculate v⃗(k⃗)...")
+        @time vkx, vky, vkz = calculate_velocities_faH(deltakm, kF)
+        deltakm = nothing  # free memory
+        println("Calculate v⃗(r⃗)...")
+        @time vx = rfftplan \ vkx
+        @time @. vx *= faH * (nx*ny*nz) / Volume
+        vkx = nothing  # free memory
+        @time vy = rfftplan \ vky
+        @time @. vy *= faH * (nx*ny*nz) / Volume
+        vky = nothing  # free memory
+        @time vz = rfftplan \ vkz
+        @time @. vz *= faH * (nx*ny*nz) / Volume
+        vkz = nothing  # free memory
+    else
+        vx = vy = vz = 0
+    end
 
     println("Draw galaxies...")
-    #@time xyz = draw_galaxies(deltarg, Ngalaxies, Δx)
     @time xyzv = draw_galaxies_with_velocities(deltarg, vx, vy, vz, Ngalaxies, Δx)
     return xyzv
 end
