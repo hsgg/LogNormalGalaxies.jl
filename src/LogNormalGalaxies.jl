@@ -432,6 +432,25 @@ function var_global(arr, comm=MPI.COMM_WORLD)
 end
 
 
+function calculate_sigmaGsq(pk)
+end
+
+
+function pixel_window!(deltak, nxyz)
+    #nx = size(deltak)  # nx[1] is actually nx/2
+    #nx2 = (nx[1], nx[2] ÷ 2 + 1, nx[3] ÷ 2 + 1)
+    nx2 = @. nxyz ÷ 2 + 1
+    p = 1  # NGP:1, CIC:2, TSC:3
+    for k=1:size(deltak,3), j=1:size(deltak,2), i=1:size(deltak,1)
+        ikx = i - 1
+        iky = j - 1 - (j <= nx2[2] ? 0 : nxyz[2])
+        ikz = k - 1 - (k <= nx2[3] ? 0 : nxyz[3])
+        Wmesh = (j0(π*ikx/nxyz[1]) * j0(π*iky/nxyz[2]) * j0(π*ikz/nxyz[3]))^p
+        deltak[i,j,k] /= Wmesh
+    end
+end
+
+
 ################## simulate_galaxies() ##################
 # Here are multiple functions called 'simulate_galaxies()'. They only differ in
 # their interface.
@@ -465,6 +484,8 @@ function simulate_galaxies(nxyz, Lxyz, Ngalaxies, pk, kF, Δx, b, faH; rfftplan=
     @show get_rank(),deltakg[1,1,1],mean(deltakg)
     @time @. deltakm *= √(pkGm(kmode) * Volume)
     @time @. deltakg *= √(pkGg(kmode) * Volume)
+    ##@time pixel_window!(deltakm, nxyz)
+    #@time pixel_window!(deltakg, nxyz)
     deltak_phases = nothing
     kmode = nothing
     @show get_rank(),deltakm[1,1,1],mean(deltakm)
