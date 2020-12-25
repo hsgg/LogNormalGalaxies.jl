@@ -84,7 +84,10 @@ function evaluate_past_boundary(spl::Spline1D{k,T}, x::Number) where {k,T}
         y0 = spl.y[idx]
         yp0 = derivative(spl, x0)
         p = x0 * yp0 / y0
-        #@show "powerlaw",x,x0,yp0,p
+        if isnan(p)
+            p = T(0)
+        end
+        #@show "powerlaw",x,x0,y0,yp0,p
         return y0 * (x / x0)^p
     else
         error("Unkown ExtrapolationType '$(spl.extrapolation)'")

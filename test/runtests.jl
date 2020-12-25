@@ -22,7 +22,7 @@ function compile_and_load()
     nbar = 3e-4
     L = 2e3
     ΔL = 50.0  # buffer for RSD
-    n = 16
+    n = 64
     #Random.seed!(8143083339)
 
     # generate catalog
@@ -73,11 +73,43 @@ function test_pk_to_pkG(D²)
 end
 
 
+function test_zero_pk()
+    pk(k) = 0.0
+    #k, pkG = LogNormalGalaxies.pk_to_pkG(pk)
+    k = 10.0 .^ (-3:0.01:0)
+    pkG = LogNormalGalaxies.Spline1D(k, pk.(k), extrapolation=LogNormalGalaxies.Splines.powerlaw)
+    @test pkG(0) == 0
+    @test pkG(0.0) == 0
+    @test pkG(0.1) == 0
+
+    nbar = 3e-4
+    L = 1000.0
+    n = 64
+    b = 1.0
+    f = 1
+    x⃗, Ψ = simulate_galaxies(nbar, L, pk; nmesh=n, bias=b, f=1, rfftplanner=LogNormalGalaxies.plan_with_fftw)
+end
+
+
+function test_cutoff_pk()
+    data = readdlm((@__DIR__)*"/rockstar_matterpower.dat", comments=true)
+    _pk = Spline1D(data[:,1], data[:,2], extrapolation=Splines.powerlaw)
+    k0 = 5e-2
+    pk(k) = 0.5^2 * _pk(k) * exp(-(k/k0)^2)
+    k, pkG = LogNormalGalaxies.pk_to_pkG(pk)
+    @test pkG(0) == 0
+end
+
+
 function main()
-    test_pk_to_pkG(0.1)
-    test_pk_to_pkG(1.0)
-    compile_and_load()
-    test_random_phases()
+    @testset "LogNormalGalaxies" begin
+        test_pk_to_pkG(0.1)
+        test_pk_to_pkG(1.0)
+        compile_and_load()
+        test_random_phases()
+        test_zero_pk()
+        test_cutoff_pk()
+    end
 end
 
 

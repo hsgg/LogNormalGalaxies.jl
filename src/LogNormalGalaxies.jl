@@ -27,7 +27,7 @@ using Random
 using .Splines
 
 using QuadOsc
-#using QuadGK
+using QuadGK
 
 #using PyPlot
 
@@ -74,8 +74,8 @@ function plan_with_pencilffts(nxyz)
     return rfftplan
 end
 
-#default_plan = plan_with_fftw
-default_plan = plan_with_pencilffts
+default_plan = plan_with_fftw
+#default_plan = plan_with_pencilffts
 
 
 Base.deepcopy(pa::PencilArray) = PencilArray(pencil(pa), deepcopy(parent(pa)))
@@ -202,6 +202,10 @@ function pk_to_pkG(pkfn)
     #xi3 = xicalc00_quadosc.(pkfn, r3)
 
     r, xi = r1, xi1
+    #r, xi = r3, xi3
+
+    #@show r[1],xi[1]
+    #@show r[end],xi[end]
 
     #close("all")
 
@@ -214,15 +218,23 @@ function pk_to_pkG(pkfn)
     #yscale("log")
     #legend()
 
-    sel = @. 1e-5 <= r <= 1e7
+    sel = @. 1e-5 <= r <= 1e4
     r = r[sel]
     xi = xi[sel]
 
-    #sel2 = @. 1e-5 <= r2 <= 1e7
-    #r2 = r2[sel2]
-    #xi2 = xi2[sel2]
-
     xiG = @. log1p(xi)
+
+    # ensure that it goes towards zero
+    #@show r[1],xiG[1:2]
+    #@show r[end],xiG[end-4:end]
+    while abs(xiG[end]) > abs(xiG[end-1])
+        #@show r[end],xiG[end]
+        r = r[1:end-1]
+        xiG = xiG[1:end-1]
+    end
+    #@show r[1],xiG[1:2]
+    #@show r[end],xiG[end-4:end]
+
     xiGfn = Spline1D(r, xiG, extrapolation=Splines.powerlaw)
     #xiG2 = @. log1p(xi2)
     #xiG3 = @. log1p(xi3)
@@ -255,6 +267,7 @@ function pk_to_pkG(pkfn)
     pkG3 .*= (2π)^3
 
     k, pkG = k3, pkG3
+    #@show pkG
 
     #figure()
     #plot(k, pkfn.(k), "k", L"P(k)")
@@ -269,21 +282,29 @@ function pk_to_pkG(pkfn)
     ##ylim(1e-14, 1e5)
     #legend()
 
-    @show k[1], pkG[1]
+    #@show k[1], pkG[1]
 
     # the extremes lead to overflow
-    sel = @. (pkG > 0)
+    sel = @. (pkG >= 0)
     k = k[sel][3:end-2]
     pkG = pkG[sel][3:end-2]
-    @show k[1], pkG[1]
+    #@show k[1], pkG[1]
+    while pkG[end] > pkG[end-1]
+        k = k[1:end-1]
+        pkG = pkG[1:end-1]
+    end
+    #@show pkG
 
     sel = @. 1e-5 <= k <= 1e2
     k = k[sel]
     pkG = pkG[sel]
-    @show k[1], pkG[1]
+    #@show pkG
+
+    #@show k[1], pkG[1]
+    #@show k[end], pkG[end]
 
     pkGfn = Spline1D(k, pkG, extrapolation=Splines.powerlaw)
-    @show pkGfn.([0.0, 1e-4])
+    #@show pkGfn.([0.0, 1e-4])
     return k, pkGfn
 end
 
@@ -292,20 +313,20 @@ end
 
 function draw_phases(rfftplan)
     deltar = allocate_input(rfftplan)
-    @show size(deltar),length(deltar)
+    #@show size(deltar),length(deltar)
     randn!(parent(deltar))
-    @show mean(deltar),var_global(deltar)
+    #@show mean(deltar),var_global(deltar)
     @assert !isnan(mean(deltar))
 
     @time deltak_phases = rfftplan * deltar
-    @show mean(deltak_phases)
+    #@show mean(deltak_phases)
     @assert !isnan(mean(deltak_phases))
 
     @time @. deltak_phases /= abs(deltak_phases)
-    @show mean(deltak_phases)
+    #@show mean(deltak_phases)
     @assert !isnan(mean(deltak_phases))
-    @show sizeof_global(deltak_phases)/1024^3
-    @show sizeof(rfftplan)
+    #@show sizeof_global(deltak_phases)/1024^3
+    #@show sizeof(rfftplan)
     return deltak_phases
 end
 
@@ -442,7 +463,30 @@ function var_global(arr, comm=MPI.COMM_WORLD)
 end
 
 
-function calculate_sigmaGsq(pk)
+# Fourier transform of a unit sphere.
+function W(x)
+    if abs(x) < 2e-1
+        return @evalpoly(x, 1, 0, -1/10, 0, 1/280, 0, -1/15120, 0, 1/1330560)
+    else
+        return 3 * (sin(x) - x * cos(x)) / x^3
+    end
+end
+
+
+function calculate_sigmaGsq(pk, Vcell)
+    R = cbrt(Vcell / (4*π/3))
+    @show Vcell R
+    integrand(lnk::T) where {T<:Real} = begin
+        k = exp(lnk)
+        k3 = k^3
+        if !isfinite(k3)
+            return T(0)
+        end
+        return k3 * pk(k) * W(R*k)^2
+    end
+    I, E = quadgk(integrand, -Inf, Inf)
+    σ² = I / (2 * π^2)
+    return log(1 + σ²)
 end
 
 
@@ -477,38 +521,45 @@ function simulate_galaxies(nxyz, Lxyz, Ngalaxies, pk, kF, Δx, b, faH; rfftplan=
     kGm, pkGm = pk_to_pkG(pk)
     kGg, pkGg = pk_to_pkG(k -> b^2 * pk(k))
 
-    @show pkGm.([0.0,1.0])
-    @show pkGg.([0.0,1.0])
+    #@show pkGm.([0.0,1.0])
+    #@show pkGg.([0.0,1.0])
 
     println("Draw random phases...")
     deltak_phases = draw_phases(rfftplan)
-    @show get_rank(),deltak_phases[1,1,1],mean(deltak_phases)
+    #@show get_rank(),deltak_phases[1,1,1],mean(deltak_phases)
     println("Calculate kmode...")
     @time kmode = calc_kmode(nx, ny, nz, kF, pencil(deltak_phases))
-    @show get_rank(),kmode[1,1,1],mean(kmode)
+    #@show get_rank(),kmode[1,1,1],mean(kmode)
     Volume = (2π / kF)^3
     println("Calculate deltak{m,g}...")
     @time deltakm = deepcopy(deltak_phases)
     @time deltakg = deltak_phases
-    @show get_rank(),deltakm[1,1,1],mean(deltakm)
-    @show get_rank(),deltakg[1,1,1],mean(deltakg)
+    #@show get_rank(),deltakm[1,1,1],mean(deltakm)
+    #@show get_rank(),deltakg[1,1,1],mean(deltakg)
     @time @. deltakm *= √(pkGm(kmode) * Volume)
+    isneg = @. (pkGg(kmode) < 0)
+    for i in eachindex(kmode)
+        if pkGg(kmode[i]) < 0
+	    @show i,kmode[i],pkGg(kmode[i])
+            return
+        end
+    end
     @time @. deltakg *= √(pkGg(kmode) * Volume)
     ##@time pixel_window!(deltakm, nxyz)
     #@time pixel_window!(deltakg, nxyz)
     deltak_phases = nothing
     kmode = nothing
-    @show get_rank(),deltakm[1,1,1],mean(deltakm)
-    @show get_rank(),deltakg[1,1,1],mean(deltakg)
+    #@show get_rank(),deltakm[1,1,1],mean(deltakm)
+    #@show get_rank(),deltakg[1,1,1],mean(deltakg)
     println("Calculate deltar{m,g}...")
     @time deltarm = rfftplan \ deltakm
     @time deltarg = rfftplan \ deltakg
-    @show get_rank(),"interim",deltarm[1,1,1],mean(deltakm)
-    @show get_rank(),"interim",deltarg[1,1,1],mean(deltakg)
+    #@show get_rank(),"interim",deltarm[1,1,1],mean(deltakm)
+    #@show get_rank(),"interim",deltarg[1,1,1],mean(deltakg)
     @time @. deltarm *= (nx*ny*nz) / Volume
     @time @. deltarg *= (nx*ny*nz) / Volume
-    @show get_rank(),deltarm[1,1,1],mean(deltakm)
-    @show get_rank(),deltarg[1,1,1],mean(deltakg)
+    #@show get_rank(),deltarm[1,1,1],mean(deltakm)
+    #@show get_rank(),deltarg[1,1,1],mean(deltakg)
     deltakg = nothing
     @show mean(deltarm),std(deltarm)
     @show extrema(deltarm)
@@ -519,6 +570,12 @@ function simulate_galaxies(nxyz, Lxyz, Ngalaxies, pk, kF, Δx, b, faH; rfftplan=
     println("Transform G → δ...")
     σGm² = var_global(deltarm)
     σGg² = var_global(deltarg)
+    #σGm²_th = calculate_sigmaGsq(pkGm, prod(Lxyz ./ nxyz))
+    #σGg²_th = calculate_sigmaGsq(pkGg, prod(Lxyz ./ nxyz))
+    #@show σGm²,σGm²_th,σGm²/σGm²_th
+    #@show σGg²,σGg²_th,σGg²/σGg²_th
+    #@show var(deltarg)
+    #return
     @time @. deltarm = exp(deltarm - σGm²/2) - 1
     @time @. deltarg = exp(deltarg - σGg²/2) - 1
     @show σGm² σGg²
