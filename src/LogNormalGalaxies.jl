@@ -322,7 +322,7 @@ function draw_phases(rfftplan)
     #@show mean(deltak_phases)
     @assert !isnan(mean(deltak_phases))
 
-    @time @. deltak_phases /= abs(deltak_phases)
+    @. deltak_phases /= abs(deltak_phases)
     #@show mean(deltak_phases)
     @assert !isnan(mean(deltak_phases))
     #@show sizeof_global(deltak_phases)/1024^3
@@ -396,7 +396,7 @@ function draw_galaxies_with_velocities(deltar, vx, vy, vz, Ngalaxies, Δx=1.0)
         vz_global = global_view(vz)
     end
     localrange = range_local(deltar)
-    @time for k=localrange[3], j=localrange[2], i=localrange[1]
+    for k=localrange[3], j=localrange[2], i=localrange[1]
         Nthiscell = pois_rand((1 + deltar_global[i,j,k]) * Navg)
         for n=1:Nthiscell
             x = i - 1 + rand()
@@ -416,7 +416,7 @@ function draw_galaxies_with_velocities(deltar, vx, vy, vz, Ngalaxies, Δx=1.0)
             end
         end
     end
-    @time xyzv_out = reshape(xyzv, 6, :)
+    xyzv_out = reshape(xyzv, 6, :)
     return xyzv_out
 end
 
@@ -515,28 +515,28 @@ function simulate_galaxies(nxyz, Lxyz, Ngalaxies, pk, kF, Δx, b, faH; rfftplan=
     Lx, Ly, Lz = Lxyz
     Volume = Lx * Ly * Lz
 
-    println("Convert to log-normal...")
+    #println("Convert to log-normal...")
     #kln = readdlm("$root/data/fog_r1000_pkG.dat")[:,1]
     #pkGln = readdlm("$root/data/fog_r1000_pkG.dat")[:,2]
     kGm, pkGm = pk_to_pkG(pk)
-    kGg, pkGg = pk_to_pkG(k -> b^2 * pk(k))
+    kGg, pkGg = pk_to_pkG(isa(pk,ConstantFn) ? ConstantFn(b^2 * pk.val) : k -> b^2 * pk(k))
 
     #@show pkGm.([0.0,1.0])
     #@show pkGg.([0.0,1.0])
 
-    println("Draw random phases...")
+    #println("Draw random phases...")
     deltak_phases = draw_phases(rfftplan)
     #@show get_rank(),deltak_phases[1,1,1],mean(deltak_phases)
-    println("Calculate kmode...")
-    @time kmode = calc_kmode(nx, ny, nz, kF, pencil(deltak_phases))
+    #println("Calculate kmode...")
+    kmode = calc_kmode(nx, ny, nz, kF, pencil(deltak_phases))
     #@show get_rank(),kmode[1,1,1],mean(kmode)
     Volume = (2π / kF)^3
-    println("Calculate deltak{m,g}...")
-    @time deltakm = deepcopy(deltak_phases)
-    @time deltakg = deltak_phases
+    #println("Calculate deltak{m,g}...")
+    deltakm = deepcopy(deltak_phases)
+    deltakg = deltak_phases
     #@show get_rank(),deltakm[1,1,1],mean(deltakm)
     #@show get_rank(),deltakg[1,1,1],mean(deltakg)
-    @time @. deltakm *= √(pkGm(kmode) * Volume)
+    @. deltakm *= √(pkGm(kmode) * Volume)
     isneg = @. (pkGg(kmode) < 0)
     for i in eachindex(kmode)
         if pkGg(kmode[i]) < 0
@@ -544,30 +544,30 @@ function simulate_galaxies(nxyz, Lxyz, Ngalaxies, pk, kF, Δx, b, faH; rfftplan=
             return
         end
     end
-    @time @. deltakg *= √(pkGg(kmode) * Volume)
+    @. deltakg *= √(pkGg(kmode) * Volume)
     ##@time pixel_window!(deltakm, nxyz)
     #@time pixel_window!(deltakg, nxyz)
     deltak_phases = nothing
     kmode = nothing
     #@show get_rank(),deltakm[1,1,1],mean(deltakm)
     #@show get_rank(),deltakg[1,1,1],mean(deltakg)
-    println("Calculate deltar{m,g}...")
-    @time deltarm = rfftplan \ deltakm
-    @time deltarg = rfftplan \ deltakg
+    #println("Calculate deltar{m,g}...")
+    deltarm = rfftplan \ deltakm
+    deltarg = rfftplan \ deltakg
     #@show get_rank(),"interim",deltarm[1,1,1],mean(deltakm)
     #@show get_rank(),"interim",deltarg[1,1,1],mean(deltakg)
-    @time @. deltarm *= (nx*ny*nz) / Volume
-    @time @. deltarg *= (nx*ny*nz) / Volume
+    @. deltarm *= (nx*ny*nz) / Volume
+    @. deltarg *= (nx*ny*nz) / Volume
     #@show get_rank(),deltarm[1,1,1],mean(deltakm)
     #@show get_rank(),deltarg[1,1,1],mean(deltakg)
     deltakg = nothing
-    @show mean(deltarm),std(deltarm)
-    @show extrema(deltarm)
-    @show mean(deltarg),std(deltarg)
-    @show extrema(deltarg)
+    #@show mean(deltarm),std(deltarm)
+    #@show extrema(deltarm)
+    #@show mean(deltarg),std(deltarg)
+    #@show extrema(deltarg)
 
     # G -> δ
-    println("Transform G → δ...")
+    #println("Transform G → δ...")
     σGm² = var_global(deltarm)
     σGg² = var_global(deltarg)
     #σGm²_th = calculate_sigmaGsq(pkGm, prod(Lxyz ./ nxyz))
@@ -576,13 +576,13 @@ function simulate_galaxies(nxyz, Lxyz, Ngalaxies, pk, kF, Δx, b, faH; rfftplan=
     #@show σGg²,σGg²_th,σGg²/σGg²_th
     #@show var(deltarg)
     #return
-    @time @. deltarm = exp(deltarm - σGm²/2) - 1
-    @time @. deltarg = exp(deltarg - σGg²/2) - 1
-    @show σGm² σGg²
-    @show mean(deltarm),std(deltarm)
-    @show extrema(deltarm)
-    @show mean(deltarg),std(deltarg)
-    @show extrema(deltarg)
+    @. deltarm = exp(deltarm - σGm²/2) - 1
+    @. deltarg = exp(deltarg - σGg²/2) - 1
+    #@show σGm² σGg²
+    #@show mean(deltarm),std(deltarm)
+    #@show extrema(deltarm)
+    #@show mean(deltarg),std(deltarg)
+    #@show extrema(deltarg)
 
     # calculate velocity field
     if faH != 0
@@ -608,7 +608,7 @@ function simulate_galaxies(nxyz, Lxyz, Ngalaxies, pk, kF, Δx, b, faH; rfftplan=
     end
 
     println("Draw galaxies...")
-    @time xyzv = draw_galaxies_with_velocities(deltarg, vx, vy, vz, Ngalaxies, Δx)
+    xyzv = draw_galaxies_with_velocities(deltarg, vx, vy, vz, Ngalaxies, Δx)
     return xyzv
 end
 
