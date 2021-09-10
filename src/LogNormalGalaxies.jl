@@ -190,7 +190,23 @@ end
 
 
 
+############# ConstantFn ###################33
+struct ConstantFn{T} <: Function where {T}
+    val::T
+end
+
+(cfn::ConstantFn)(x) = cfn.val
+
+
 #################### calculate P_G(k) ###########################
+function pk_to_pkG(pkfn::ConstantFn)
+    k = nothing
+    #pkGfn = ConstantFn(log(pkfn.val + 1))
+    pkGfn = ConstantFn(pkfn.val/4π)
+    #pkGfn = ConstantFn(pkfn.val)
+    return k, pkGfn
+end
+
 function pk_to_pkG(pkfn)
     ## Notes: xicalc is fast here, quadosc is too slow for large r. However,
     ## xicalc has some noise at large r. Therefore, later we need to use
