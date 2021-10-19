@@ -519,7 +519,7 @@ function simulate_galaxies(nxyz, Lxyz, Ngalaxies, pk, kF, Δx, b, faH; rfftplan=
     #kln = readdlm("$root/data/fog_r1000_pkG.dat")[:,1]
     #pkGln = readdlm("$root/data/fog_r1000_pkG.dat")[:,2]
     kGm, pkGm = pk_to_pkG(pk)
-    kGg, pkGg = pk_to_pkG(isa(pk,ConstantFn) ? ConstantFn(b^2 * pk.val) : k -> b^2 * pk(k))
+    kGg, pkGg = pk_to_pkG(k -> b^2 * pk(k))
 
     #@show pkGm.([0.0,1.0])
     #@show pkGg.([0.0,1.0])
