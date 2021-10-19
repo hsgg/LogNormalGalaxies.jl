@@ -32,7 +32,7 @@ function main()
     f = 0.71
     D = 0.82
 
-    data = readdlm((@__DIR__)*"/rockstar_matterpower.dat", comments=true)
+    data = readdlm((@__DIR__)*"/matterpower.dat", comments=true)
     _pk = Spline1D(data[:,1], data[:,2], extrapolation=Splines.powerlaw)
     pk(k) = D^2 * _pk(k)
 

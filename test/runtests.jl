@@ -15,7 +15,7 @@ function compile_and_load()
     f = 0.71
     D = 0.82
 
-    data = readdlm((@__DIR__)*"/rockstar_matterpower.dat", comments=true)
+    data = readdlm((@__DIR__)*"/matterpower.dat", comments=true)
     _pk = Spline1D(data[:,1], data[:,2], extrapolation=Splines.powerlaw)
     pk(k) = D^2 * _pk(k)
 
@@ -63,7 +63,7 @@ end
 
 function test_pk_to_pkG(D²)
     @show D²
-    data = readdlm((@__DIR__)*"/rockstar_matterpower.dat", comments=true)
+    data = readdlm((@__DIR__)*"/matterpower.dat", comments=true)
     _pk = Spline1D(data[:,1], data[:,2], extrapolation=Splines.powerlaw)
     pk(k) = D² * _pk(k)
     k, pkG = LogNormalGalaxies.pk_to_pkG(pk)
@@ -92,7 +92,7 @@ end
 
 
 function test_cutoff_pk()
-    data = readdlm((@__DIR__)*"/rockstar_matterpower.dat", comments=true)
+    data = readdlm((@__DIR__)*"/matterpower.dat", comments=true)
     _pk = Spline1D(data[:,1], data[:,2], extrapolation=Splines.powerlaw)
     k0 = 5e-2
     pk(k) = 0.5^2 * _pk(k) * exp(-(k/k0)^2)
