@@ -10,8 +10,8 @@ using MeasurePowerSpectra
 using PyPlot
 using Random
 using DelimitedFiles
-using QuadGK
-using PlaneParallelRedshiftSpaceDistortions
+#using QuadGK
+#using PlaneParallelRedshiftSpaceDistortions
 
 
 function Arsd_Kaiser(β, ℓ)
