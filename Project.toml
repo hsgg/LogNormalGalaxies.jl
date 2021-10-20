@@ -14,3 +14,6 @@ QuadOsc = "a9cf478a-2615-4838-ad15-fb8b30e5064d"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 TwoFAST = "0dd23c3e-f403-11e8-3e11-4dddf690af97"
+
+[compat]
+FFTW = "1"
