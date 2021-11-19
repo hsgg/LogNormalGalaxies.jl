@@ -44,7 +44,10 @@ j0(x) = sinc(x/π)
 
 
 function xicalc00_quadosc(fn, r)
-    I,E = quadosc(k -> k^2 * fn(k) * j0(k*r), 0, Inf, n->π*n/r)
+    # Note: The default series acceleration, the Wynn eps algorithm, somehow
+    # chokes on this.
+    I,E = quadosc(k -> k^2 * fn(k) * j0(k*r), 0, Inf, n->π*n/r,
+        accelerator=QuadOsc.accel_cohen_villegas_zagier)
     #I,E = quadgk(k -> k^2 * fn(k) * j0(k*r), 0, Inf)
     I,E = (I,E) ./ (2 * π^2)
     #@show r,I
@@ -200,6 +203,7 @@ function pk_to_pkG(pkfn)
     #r2, xi2 = xicalc(pkfn, 0, 0; kmin=1e-25, kmax=1e25, r0=1e-25, N=4096, q=2.0)
     #r3 = 10.0 .^ range(-4, 3.7, length=1000)
     #xi3 = xicalc00_quadosc.(pkfn, r3)
+    #@show "xicalc finished"
 
     r, xi = r1, xi1
     #r, xi = r3, xi3
@@ -265,6 +269,7 @@ function pk_to_pkG(pkfn)
     #pkG1 .*= (2π)^3
     #pkG2 .*= (2π)^3
     pkG3 .*= (2π)^3
+    #@show "xicalc00_quadosc finished"
 
     k, pkG = k3, pkG3
     #@show pkG
