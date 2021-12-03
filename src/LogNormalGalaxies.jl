@@ -316,10 +316,10 @@ end
 
 #################### draw deltak ###########################
 
-function draw_phases(rfftplan)
+function draw_phases(rfftplan; rng=Random.GLOBAL_RNG)
     deltar = allocate_input(rfftplan)
     #@show size(deltar),length(deltar)
-    randn!(parent(deltar))
+    randn!(rng, parent(deltar))
     #@show mean(deltar),var_global(deltar)
     @assert !isnan(mean(deltar))
 
@@ -388,7 +388,8 @@ end
 
 
 ##################### draw galaxies ###########################
-function draw_galaxies_with_velocities(deltar, vx, vy, vz, Ngalaxies, Δx=1.0)
+function draw_galaxies_with_velocities(deltar, vx, vy, vz, Ngalaxies, Δx=1.0;
+        rng=Random.GLOBAL_RNG)
     T = Float32
     rsd = !(vx == vy == vz == 0)
     nx, ny, nz = size_global(deltar)
@@ -402,11 +403,11 @@ function draw_galaxies_with_velocities(deltar, vx, vy, vz, Ngalaxies, Δx=1.0)
     end
     localrange = range_local(deltar)
     for k=localrange[3], j=localrange[2], i=localrange[1]
-        Nthiscell = pois_rand((1 + deltar_global[i,j,k]) * Navg)
+        Nthiscell = pois_rand(rng, (1 + deltar_global[i,j,k]) * Navg)
         for n=1:Nthiscell
-            x = i - 1 + rand()
-            y = j - 1 + rand()
-            z = k - 1 + rand()
+            x = i - 1 + rand(rng)
+            y = j - 1 + rand(rng)
+            z = k - 1 + rand(rng)
             push!(xyzv, x*Δx)
             push!(xyzv, y*Δx)
             push!(xyzv, z*Δx)
@@ -515,7 +516,7 @@ end
 # their interface.
 
 # simulate galaxies
-function simulate_galaxies(nxyz, Lxyz, Ngalaxies, pk, kF, Δx, b, faH; rfftplan=default_plan(nxyz))
+function simulate_galaxies(nxyz, Lxyz, Ngalaxies, pk, kF, Δx, b, faH; rfftplan=default_plan(nxyz), rng=Random.GLOBAL_RNG)
     nx, ny, nz = nxyz
     Lx, Ly, Lz = Lxyz
     Volume = Lx * Ly * Lz
@@ -530,7 +531,7 @@ function simulate_galaxies(nxyz, Lxyz, Ngalaxies, pk, kF, Δx, b, faH; rfftplan=
     #@show pkGg.([0.0,1.0])
 
     #println("Draw random phases...")
-    deltak_phases = draw_phases(rfftplan)
+    deltak_phases = draw_phases(rfftplan; rng)
     #@show get_rank(),deltak_phases[1,1,1],mean(deltak_phases)
     #println("Calculate kmode...")
     kmode = calc_kmode(nx, ny, nz, kF, pencil(deltak_phases))
@@ -613,13 +614,13 @@ function simulate_galaxies(nxyz, Lxyz, Ngalaxies, pk, kF, Δx, b, faH; rfftplan=
     end
 
     println("Draw galaxies...")
-    xyzv = draw_galaxies_with_velocities(deltarg, vx, vy, vz, Ngalaxies, Δx)
+    xyzv = draw_galaxies_with_velocities(deltarg, vx, vy, vz, Ngalaxies, Δx; rng)
     return xyzv
 end
 
 
 function simulate_galaxies(nbar, Lbox, pk; nmesh=256, bias=1.0, f=0.0,
-        rfftplanner=default_plan)
+        rfftplanner=default_plan, rng=Random.GLOBAL_RNG)
     aH = 1
     b = bias
     L = Lbox
@@ -635,7 +636,7 @@ function simulate_galaxies(nbar, Lbox, pk; nmesh=256, bias=1.0, f=0.0,
     rfftplan = rfftplanner(nxyz)
 
     @time xyzv = simulate_galaxies(nxyz, Lxyz, Ngalaxies, pk, kF, Δx, b, f;
-                                   rfftplan=rfftplan)
+                                   rfftplan, rng)
     xyz = @. xyzv[1:3,:] - Float32(L / 2)
     v = xyzv[4:6,:]
     return xyz, v
