@@ -64,8 +64,11 @@ end
 function test_pk_to_pkG(D²)
     @show D²
     data = readdlm((@__DIR__)*"/matterpower.dat", comments=true)
+    println("data read")
     _pk = Spline1D(data[:,1], data[:,2], extrapolation=Splines.powerlaw)
+    println("data splined")
     pk(k) = D² * _pk(k)
+    println("D^2 multiplied")
     k, pkG = LogNormalGalaxies.pk_to_pkG(pk)
     @show D²,pk.([0.0, 1e-4, 1e-3, 1e-2, 1e-1, 1])
     @show D²,pkG.([0.0, 1e-4, 1e-3, 1e-2, 1e-1, 1])
