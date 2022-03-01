@@ -480,7 +480,7 @@ end
 
 
 function calculate_sigmaGsq(pk, Vcell)
-    R = cbrt(Vcell / (4*π/3))
+    R = cbrt(Vcell / (4*π/3))  # this is for spherical cells, but our cells are cubic
     @show Vcell R
     integrand(lnk::T) where {T<:Real} = begin
         k = exp(lnk)
@@ -492,7 +492,9 @@ function calculate_sigmaGsq(pk, Vcell)
     end
     I, E = quadgk(integrand, -Inf, Inf)
     σ² = I / (2 * π^2)
-    return log(1 + σ²)
+    @show σ² E
+    return σ²
+    #return log(1 + σ²)
 end
 
 

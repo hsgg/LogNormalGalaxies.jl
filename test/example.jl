@@ -40,7 +40,7 @@ function main()
     L = 2e3
     ΔL = 50.0  # buffer for RSD
     n = 512
-    Random.seed!(8143083339)
+    #Random.seed!(8143083339)
 
     # generate catalog
     x⃗, Ψ = simulate_galaxies(nbar, L+ΔL, pk; nmesh=n, bias=b, f=1)

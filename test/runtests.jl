@@ -51,7 +51,7 @@ end
 function test_random_phases()
     # test random phases
     n = 64
-    seed = rand(UInt64)
+    seed = rand(UInt128)
     Random.seed!(seed)
     @show seed
     μ, v, d = create_randn(n, LogNormalGalaxies.plan_with_fftw)
@@ -120,6 +120,7 @@ end
 
 
 TestLogNormalGalaxies.main()
+include("lognormals_50sims.jl")
 
 
 # vim: set sw=4 et sts=4 :
