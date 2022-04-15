@@ -53,7 +53,7 @@ PencilFFTs.allocate_input(plan::FFTW.FFTWPlan{T}) where {T} = Array{T}(undef, si
 function start_mpi(comm=MPI.COMM_WORLD)
     MPI.Initialized() || MPI.Init()
     rank = MPI.Comm_rank(comm)
-    println("This is $(rank) of $(MPI.Comm_size(comm))")
+    println("MPI initialized. This is rank $(rank) of $(MPI.Comm_size(comm)).")
     #rank == 0 || redirect_stdout(open("/dev/null", "w"))
     return rank, comm
 end
@@ -69,27 +69,26 @@ end
 # process into one single xyzv on the rank=0 process, and concatenates along
 # the last axis.
 function concatenate_mpi_arr(x::AbstractVector, T=Float32, comm=MPI.COMM_WORLD)
-    test_mpi()
+    #test_mpi()
     if get_rank(comm) == 0
         # use our own
         x_out = Array{T}(x)
-        # receive from all others
         for rank=1:MPI.Comm_size(comm)-1
             len, status = MPI.Recv(Int64, rank, 0, comm)
-            @show rank,len
+            println("Receiving $len from rank $rank (status=$status)...")
             x_remote = typeof(x_out)(undef, len)
             status = MPI.Recv!(x_remote, rank, 1, comm)
+            println("Received $len from rank $rank (status=$status).")
             append!(x_out, x_remote)
-            @show rank,"recv done"
         end
         return x_out
     else
+        rank = get_rank(comm)
         x_r = Array{T}(x)
-        # send size to rank = 0
+        println("Rank $(rank) sending $(length(x_r)) to rank 0...")
         MPI.Send(Int64(length(x_r)), 0, 0, comm)
-        # send galaxies to rank = 0
         MPI.Send(x_r, 0, 1, comm)
-        @show get_rank(),"send done"
+        println("Rank $(rank) sent $(length(x_r)) to rank 0.")
         return fill(NaN32, 0)
     end
 end

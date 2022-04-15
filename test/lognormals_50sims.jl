@@ -23,7 +23,7 @@ function Arsd_Kaiser(β, ℓ)
 end
 
 
-function generate_sims(pk, nbar, b, f, L, n)
+function generate_sims(pk, nbar, b, f, L, n; rfftplanner=LogNormalGalaxies.plan_with_fftw)
     ΔL = 50.0  # buffer for RSD
     nrlz = 1
 
@@ -53,7 +53,9 @@ function generate_sims(pk, nbar, b, f, L, n)
         #Random.seed!(seeds[rlz])
 
         # generate catalog
-        @time x⃗, Ψ = simulate_galaxies(nbar, L+ΔL, pk; nmesh=n, bias=b, f=1, rfftplanner=LogNormalGalaxies.plan_with_fftw)
+        @time x⃗, Ψ = simulate_galaxies(nbar, L+ΔL, pk; nmesh=n, bias=b, f=1, rfftplanner=rfftplanner)
+
+        println("Gather galaxies...")
         x⃗ = LogNormalGalaxies.concatenate_mpi_arr(x⃗)
         Ψ = LogNormalGalaxies.concatenate_mpi_arr(Ψ)
 
@@ -97,7 +99,11 @@ function main()
     n = 128
     #Random.seed!(8143083339)  # don't initialize all MPI processes with the same seed!
 
-    km, pkm, Mlm, Ngalaxies = generate_sims(pk, nbar, b, f, L, n)
+    println("Running with FFTW...")
+    km, pkm, Mlm, Ngalaxies = generate_sims(pk, nbar, b, f, L, n; rfftplanner=LogNormalGalaxies.plan_with_fftw)
+
+    println("Running with PencilFFTs...")
+    km, pkm, Mlm, Ngalaxies = generate_sims(pk, nbar, b, f, L, n; rfftplanner=LogNormalGalaxies.plan_with_pencilffts)
 
     # theory
     β = f / b
