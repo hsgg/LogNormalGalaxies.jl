@@ -4,6 +4,9 @@
 # This version can use either FFTW or PencilFFTs.jl to distribute the density
 # field over several nodes. PencilFFTs.jl, in turn, uses MPI for this task.
 
+# TODO:
+# * support general rectangular cuboid boxes
+
 
 module LogNormalGalaxies
 
@@ -31,7 +34,7 @@ using QuadGK
 
 
 # common functions
-j0(x) = sinc(x/π)  # this function is used in some included files
+j0(x) = sinc(x/π)  # this function is used in multiple locations
 
 # intra-module include files
 include("pk_to_pkG.jl")
@@ -66,8 +69,8 @@ function plan_with_pencilffts(nxyz)
     return rfftplan
 end
 
-default_plan = plan_with_fftw
-#default_plan = plan_with_pencilffts
+const default_plan = plan_with_fftw
+#const default_plan = plan_with_pencilffts
 
 
 
@@ -117,9 +120,9 @@ function calculate_velocities_faH(deltak, kF)
     nx2, ny, nz = size_global(deltak)
     ny2 = div(ny,2) + 1
     nz2 = div(nz,2) + 1
-    vkx = deepcopy(deltak)
-    vky = deepcopy(deltak)
-    vkz = deepcopy(deltak)
+    vkx = similar(deltak)
+    vky = similar(deltak)
+    vkz = similar(deltak)
     localrange = range_local(deltak)
     for k=1:size(deltak,3), j=1:size(deltak,2), i=1:size(deltak,1)
         ig = localrange[1][i]  # global index of local index i
