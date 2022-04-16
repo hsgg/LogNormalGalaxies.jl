@@ -179,8 +179,9 @@ function draw_galaxies_with_velocities(deltar, vx, vy, vz, Ngalaxies, Δx=1.0;
         end
         Ngalaxies_local_actual += Nthiscell
     end
+    resize!(xyzv, 6 * Ngalaxies_local_actual)
     xyzv_out = reshape(xyzv, 6, :)
-    return xyzv_out[:,1:Ngalaxies_local_actual]
+    return xyzv_out
 end
 
 

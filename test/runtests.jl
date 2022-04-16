@@ -8,6 +8,7 @@ using LogNormalGalaxies
 using LogNormalGalaxies.Splines
 using DelimitedFiles
 using Random
+using BenchmarkTools
 
 
 function compile_and_load()
@@ -116,6 +117,7 @@ function test_draw_galaxies_with_velocities()
     @time xyzv = LogNormalGalaxies.draw_galaxies_with_velocities(deltar, vx, vy, vz, Ngalaxies, Δx)
     @time xyzv = LogNormalGalaxies.draw_galaxies_with_velocities(deltar, vx, vy, vz, Ngalaxies, Δx)
     @time xyzv = LogNormalGalaxies.draw_galaxies_with_velocities(deltar, vx, vy, vz, Ngalaxies, Δx)
+    @btime LogNormalGalaxies.draw_galaxies_with_velocities($deltar, $vx, $vy, $vz, $Ngalaxies, $Δx)
 end
 
 
