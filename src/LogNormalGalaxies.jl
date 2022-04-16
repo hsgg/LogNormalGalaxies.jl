@@ -81,15 +81,15 @@ function draw_phases(rfftplan; rng=Random.GLOBAL_RNG)
     #@show size(deltar),length(deltar)
     randn!(rng, parent(deltar))
     #@show mean(deltar),var_global(deltar)
-    @assert !isnan(mean(deltar))
+    #@assert !isnan(mean(deltar))
 
     @time deltak_phases = rfftplan * deltar
     #@show mean(deltak_phases)
-    @assert !isnan(mean(deltak_phases))
+    #@assert !isnan(mean(deltak_phases))
 
     @. deltak_phases /= abs(deltak_phases)
     #@show mean(deltak_phases)
-    @assert !isnan(mean(deltak_phases))
+    #@assert !isnan(mean(deltak_phases))
     #@show sizeof_global(deltak_phases)/1024^3
     #@show sizeof(rfftplan)
     return deltak_phases
