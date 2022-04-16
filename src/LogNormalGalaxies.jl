@@ -151,33 +151,36 @@ function draw_galaxies_with_velocities(deltar, vx, vy, vz, Ngalaxies, Δx=1.0;
     rsd = !(vx == vy == vz == 0)
     nx, ny, nz = size_global(deltar)
     Navg = Ngalaxies / (nx * ny * nz)
-    xyzv = T[]
+    xyzv = fill(T(0), 6*Ngalaxies)
     localrange = range_local(deltar)
+    Ngalaxies_local_actual = 0
     for k=1:size(deltar,3), j=1:size(deltar,2), i=1:size(deltar,1)
         ig = localrange[1][i]  # global index of local index i
         jg = localrange[2][j]  # global index of local index j
         kg = localrange[3][k]  # global index of local index k
         Nthiscell = pois_rand(rng, (1 + deltar[i,j,k]) * Navg)
+        g0 = 6 * Ngalaxies_local_actual  # g0 is the index in the xyzv 1D-array
+        if g0 + 6*Nthiscell > length(xyzv)
+            resize!(xyzv, length(xyzv) + 6*Nthiscell)
+        end
         for n=1:Nthiscell
             x = ig - 1 + rand(rng)
             y = jg - 1 + rand(rng)
             z = kg - 1 + rand(rng)
-            push!(xyzv, x*Δx)
-            push!(xyzv, y*Δx)
-            push!(xyzv, z*Δx)
+            xyzv[g0+1] = x*Δx
+            xyzv[g0+2] = y*Δx
+            xyzv[g0+3] = z*Δx
             if rsd
-                push!(xyzv, vx[i,j,k])
-                push!(xyzv, vy[i,j,k])
-                push!(xyzv, vz[i,j,k])
-            else
-                push!(xyzv, T(0))
-                push!(xyzv, T(0))
-                push!(xyzv, T(0))
-            end
+                xyzv[g0+4] = vx[i,j,k]
+                xyzv[g0+5] = vy[i,j,k]
+                xyzv[g0+6] = vz[i,j,k]
+            end # else xyzv[4:6] = 0
+            g0 += 6
         end
+        Ngalaxies_local_actual += Nthiscell
     end
     xyzv_out = reshape(xyzv, 6, :)
-    return xyzv_out
+    return xyzv_out[:,1:Ngalaxies_local_actual]
 end
 
 

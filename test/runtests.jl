@@ -104,6 +104,21 @@ function test_cutoff_pk()
 end
 
 
+function test_draw_galaxies_with_velocities()
+    # The function 'draw_galaxies_with_velocities()' is a performance bottleneck.
+    nnn = 128, 128, 128
+    deltar = randn(nnn...)
+    vx = randn(nnn...) / 10
+    vy = randn(nnn...) / 10
+    vz = randn(nnn...) / 10
+    Ngalaxies = 1_000_000
+    Δx = 1.0
+    @time xyzv = LogNormalGalaxies.draw_galaxies_with_velocities(deltar, vx, vy, vz, Ngalaxies, Δx)
+    @time xyzv = LogNormalGalaxies.draw_galaxies_with_velocities(deltar, vx, vy, vz, Ngalaxies, Δx)
+    @time xyzv = LogNormalGalaxies.draw_galaxies_with_velocities(deltar, vx, vy, vz, Ngalaxies, Δx)
+end
+
+
 function main()
     @testset "LogNormalGalaxies" begin
         test_pk_to_pkG(0.1)
@@ -112,6 +127,7 @@ function main()
         test_random_phases()
         test_zero_pk()
         test_cutoff_pk()
+        test_draw_galaxies_with_velocities()
     end
 end
 
