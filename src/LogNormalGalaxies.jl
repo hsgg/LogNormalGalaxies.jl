@@ -394,7 +394,7 @@ function simulate_galaxies(nbar, Lbox, pk; nmesh=256, bias=1.0, f=0.0,
 
     rfftplan = rfftplanner(nxyz)
 
-    @time xyzv = simulate_galaxies(nxyz, Lxyz, Ngalaxies, pk, kF, Δx, b, f;
+    xyzv = simulate_galaxies(nxyz, Lxyz, Ngalaxies, pk, kF, Δx, b, f;
                                    rfftplan, rng)
     xyz = @. xyzv[1:3,:] - Float32(L / 2)
     v = xyzv[4:6,:]

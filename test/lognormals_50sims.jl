@@ -1,3 +1,5 @@
+using LogNormalGalaxies
+
 module lognormals
 
 
@@ -25,7 +27,7 @@ end
 
 function generate_sims(pk, nbar, b, f, L, n; rfftplanner=LogNormalGalaxies.plan_with_fftw)
     ΔL = 50.0  # buffer for RSD
-    nrlz = 1
+    nrlz = 10
 
     Lx, Ly, Lz = L, L, L
     nx, ny, nz = n, n, n
@@ -34,6 +36,7 @@ function generate_sims(pk, nbar, b, f, L, n; rfftplanner=LogNormalGalaxies.plan_
     #nx, ny, nz = n, floor(Int, 0.7n), floor(Int, 0.5n)
 
     x⃗ = fill(0.0, 3, 1)
+    @show size(x⃗)
     km, pkm, Mlm, Ngalaxies = xgals_to_pkm([Lx,Ly,Lz], [nx,ny,nz], x⃗; lmax=4)
     pkm .= 0
     Mlm .= 0
@@ -71,6 +74,7 @@ function generate_sims(pk, nbar, b, f, L, n; rfftplanner=LogNormalGalaxies.plan_
         @. sel &= -Ly/2 <= x⃗[2,:] <= Ly/2
         @. sel &= -Lz/2 <= x⃗[3,:] <= Lz/2
         x⃗ = x⃗[:,sel]
+        @show size(x⃗)
 
         # measure multipoles
         kmi, pkmi, Mlmi, Ngalaxiesi = xgals_to_pkm([Lx,Ly,Lz], [nx,ny,nz], x⃗; lmax=4)
@@ -84,7 +88,7 @@ function generate_sims(pk, nbar, b, f, L, n; rfftplanner=LogNormalGalaxies.plan_
 end
 
 
-function main()
+function main(fbase, rfftplanner=LogNormalGalaxies.plan_with_fftw)
     b = 1.8
     f = 0.71
     D = 0.4  # deliberately high power spectrum amplitude for testing
@@ -99,11 +103,8 @@ function main()
     n = 128
     #Random.seed!(8143083339)  # don't initialize all MPI processes with the same seed!
 
-    println("Running with FFTW...")
-    km, pkm, Mlm, Ngalaxies = generate_sims(pk, nbar, b, f, L, n; rfftplanner=LogNormalGalaxies.plan_with_fftw)
-
-    println("Running with PencilFFTs...")
-    km, pkm, Mlm, Ngalaxies = generate_sims(pk, nbar, b, f, L, n; rfftplanner=LogNormalGalaxies.plan_with_pencilffts)
+    println("Running with $(rfftplanner)...")
+    km, pkm, Mlm, Ngalaxies = generate_sims(pk, nbar, b, f, L, n; rfftplanner=rfftplanner)
 
     # theory
     β = f / b
@@ -124,13 +125,15 @@ function main()
     xscale("log")
     xlim(right=0.6)
     legend(fontsize="small")
-    savefig((@__DIR__)*"/lognormals.pdf")
+    savefig((@__DIR__)*"/$(fbase).pdf")
 end
 
 
 end # module
 
-lognormals.main()
+lognormals.main("sims_fftw", LogNormalGalaxies.plan_with_fftw)
+
+lognormals.main("sims_pencilffts", LogNormalGalaxies.plan_with_pencilffts)
 
 
 # vim: set sw=4 et sts=4 :
