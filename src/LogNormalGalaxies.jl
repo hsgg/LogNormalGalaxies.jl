@@ -165,8 +165,9 @@ function draw_galaxies_with_velocities(deltar, vx, vy, vz, Ngalaxies, Δx=1.0;
         g0 = 6 * Ngalaxies_local_actual  # g0 is the index in the xyzv 1D-array
         if g0 + 6*Nthiscell > length(xyzv)
             resize!(xyzv, length(xyzv) + 6*Nthiscell)
+            xyzv[g0:end] .= 0  # in case rsd=false
         end
-        for n=1:Nthiscell
+        for _=1:Nthiscell
             x = ig - 1 + rand(rng)
             y = jg - 1 + rand(rng)
             z = kg - 1 + rand(rng)
@@ -264,7 +265,7 @@ function pixel_window!(deltak, nxyz)
     #nx2 = (nx[1], nx[2] ÷ 2 + 1, nx[3] ÷ 2 + 1)
     nx2 = @. nxyz ÷ 2 + 1
     p = 1  # NGP:1, CIC:2, TSC:3
-    localrange = range_local(deltar)
+    localrange = range_local(deltak)
     for k=1:size(deltak,3), j=1:size(deltak,2), i=1:size(deltak,1)
         ig = localrange[1][i]  # global index of local index i
         jg = localrange[2][j]  # global index of local index j
@@ -387,7 +388,6 @@ end
 
 function simulate_galaxies(nbar, Lbox, pk; nmesh=256, bias=1.0, f=0.0,
         rfftplanner=default_plan, rng=Random.GLOBAL_RNG)
-    aH = 1
     b = bias
     L = Lbox
     Ngalaxies = ceil(Int, L^3 * nbar)
