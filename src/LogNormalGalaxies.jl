@@ -195,9 +195,9 @@ end
 function write_galaxies(fname, LLL, xyzv)
     Ngalaxies = size(xyzv,2)
     fout = open(fname, "w")
-    write(fout, Array{Float64}(collect(LLL)))
+    write(fout, convert(Vector{Float64}, LLL))
     write(fout, Int64(Ngalaxies))
-    write(fout, Array{Float32}(xyzv))
+    write(fout, convert(Matrix{Float32}, xyzv))
     close(fout)
 end
 
@@ -205,9 +205,9 @@ end
 # read galaxies in same format as lognormal_galaxies
 function read_galaxies(fname; ncol=6)
     fin = open(fname, "r")
-    Lx, Ly, Lz = read!(fin, Array{Float64}(undef, 3))
+    Lx, Ly, Lz = read!(fin, Vector{Float64}(undef, 3))
     Ngalaxies = read(fin, Int64)
-    xyzv = read!(fin, Array{Float32,2}(undef, ncol, Ngalaxies))
+    xyzv = read!(fin, Matrix{Float32}(undef, ncol, Ngalaxies))
     close(fin)
     return (Lx, Ly, Lz), xyzv
 end
