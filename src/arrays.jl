@@ -69,27 +69,31 @@ end
 # process into one single xyzv on the rank=0 process, and concatenates along
 # the last axis.
 function concatenate_mpi_arr(x::AbstractVector, T=Float32, comm=MPI.COMM_WORLD)
+    x_r = convert(Vector{T}, x)
+
+    if !MPI.Initialized()
+        return x_r
+    end
+
     #test_mpi()
-    if get_rank(comm) == 0
+    if get_rank() == 0
         # use our own
-        x_out = Array{T}(x)
         for rank=1:MPI.Comm_size(comm)-1
             len, status = MPI.Recv(Int64, rank, 0, comm)
             println("Receiving $len from rank $rank (status=$status)...")
-            x_remote = typeof(x_out)(undef, len)
+            x_remote = typeof(x_r)(undef, len)
             status = MPI.Recv!(x_remote, rank, 1, comm)
             println("Received $len from rank $rank (status=$status).")
-            append!(x_out, x_remote)
+            append!(x_r, x_remote)
         end
-        return x_out
+        return x_r
     else
         rank = get_rank(comm)
-        x_r = Array{T}(x)
         println("Rank $(rank) sending $(length(x_r)) to rank 0...")
         MPI.Send(Int64(length(x_r)), 0, 0, comm)
         MPI.Send(x_r, 0, 1, comm)
         println("Rank $(rank) sent $(length(x_r)) to rank 0.")
-        return fill(NaN32, 0)
+        return fill(T(NaN), 0)
     end
 end
 
