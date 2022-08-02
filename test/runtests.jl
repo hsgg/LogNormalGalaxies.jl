@@ -121,6 +121,18 @@ function test_draw_galaxies_with_velocities()
 end
 
 
+function test_array_deepcopy()
+    nxyz = (2, 2, 2)
+    rfftplan = LogNormalGalaxies.plan_with_pencilffts(nxyz)
+    x = LogNormalGalaxies.allocate_input(rfftplan)
+    randn!(parent(x))
+    y = deepcopy(x)
+    @show typeof(x) typeof(y)
+    @show x y
+end
+
+
+
 function main()
     @testset "LogNormalGalaxies" begin
         test_pk_to_pkG(0.1)
@@ -130,6 +142,7 @@ function main()
         test_zero_pk()
         test_cutoff_pk()
         test_draw_galaxies_with_velocities()
+        test_array_deepcopy()
     end
 end
 
