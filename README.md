@@ -47,7 +47,7 @@ field. It should be left at `f=1`. However, if `f=0`, then the relatively
 expensive calculation to generate `psi` can be skipped (since `psi=0` in that
 case). This is useful if RSD is not needed.
 
-Thus, redshift space distortions can be added with code like
+Redshift space distortions can be added with code like
 ```julia
 num_galaxies = size(x,2)
 los = [0, 0, 1]
