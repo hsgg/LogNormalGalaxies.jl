@@ -96,11 +96,11 @@ function draw_phases(rfftplan; rng=Random.GLOBAL_RNG)
 end
 
 
-function calc_kmode(nx, ny, nz, kF, pencil_δk)
-    nx2 = div(nx,2) + 1
+function calc_kmode(kF, pencil_δk)
+    kmode = allocate_array(pencil_δk, Float64)
+    nx2, ny, nz = size(kmode)
     ny2 = div(ny,2) + 1
     nz2 = div(nz,2) + 1
-    kmode = allocate_array(pencil_δk, Float64)
     localrange = range_local(kmode)
     for k=1:size(kmode,3), j=1:size(kmode,2), i=1:size(kmode,1)
         ig = localrange[1][i]  # global index of local index i
@@ -109,7 +109,7 @@ function calc_kmode(nx, ny, nz, kF, pencil_δk)
         ikx = ig - 1
         iky = jg <= ny2 ? jg-1 : jg-1-ny
         ikz = kg <= nz2 ? kg-1 : kg-1-nz
-        kmode[i,j,k] = kF * √(ikx^2 + iky^2 + ikz^2)
+        kmode[i,j,k] = √((kF[1]*ikx)^2 + (kF[2]*iky)^2 + (kF[3]*ikz)^2)
     end
     return kmode
 end
@@ -128,19 +128,19 @@ function calculate_velocities_faH(deltak, kF)
         ig = localrange[1][i]  # global index of local index i
         jg = localrange[2][j]  # global index of local index j
         kg = localrange[3][k]  # global index of local index k
-        ikx = ig - 1
-        iky = jg <= ny2 ? jg-1 : jg-1-ny
-        ikz = kg <= nz2 ? kg-1 : kg-1-nz
-        ikmode = √(ikx^2 + iky^2 + ikz^2)
-        if ikmode == 0
+        kx = kF[1] * (ig - 1)
+        ky = kF[2] * (jg <= ny2 ? jg-1 : jg-1-ny)
+        kz = kF[3] * (kg <= nz2 ? kg-1 : kg-1-nz)
+        kmode = √(kx^2 + ky^2 + kz^2)
+        if kmode == 0
             vkx[i,j,k] = 0
             vky[i,j,k] = 0
             vkz[i,j,k] = 0
         else
-            vk = im/ikmode^2/kF*deltak[i,j,k]
-            vkx[i,j,k] = ikx*vk
-            vky[i,j,k] = iky*vk
-            vkz[i,j,k] = ikz*vk
+            vk_part = im / kmode^2 * deltak[i,j,k]
+            vkx[i,j,k] = kx * vk_part
+            vky[i,j,k] = ky * vk_part
+            vkz[i,j,k] = kz * vk_part
         end
     end
     return vkx, vky, vkz
@@ -148,7 +148,7 @@ end
 
 
 ##################### draw galaxies ###########################
-function draw_galaxies_with_velocities(deltar, vx, vy, vz, Ngalaxies, Δx=1.0;
+function draw_galaxies_with_velocities(deltar, vx, vy, vz, Ngalaxies, Δx=[1.0,1.0,1.0];
         rng=Random.GLOBAL_RNG)
     T = Float32
     rsd = !(vx == vy == vz == 0)
@@ -171,9 +171,9 @@ function draw_galaxies_with_velocities(deltar, vx, vy, vz, Ngalaxies, Δx=1.0;
             x = ig - 1 + rand(rng)
             y = jg - 1 + rand(rng)
             z = kg - 1 + rand(rng)
-            xyzv[g0+1] = x*Δx
-            xyzv[g0+2] = y*Δx
-            xyzv[g0+3] = z*Δx
+            xyzv[g0+1] = x*Δx[1]
+            xyzv[g0+2] = y*Δx[2]
+            xyzv[g0+3] = z*Δx[3]
             if rsd
                 xyzv[g0+4] = vx[i,j,k]
                 xyzv[g0+5] = vy[i,j,k]
@@ -284,10 +284,12 @@ end
 # their interface.
 
 # simulate galaxies
-function simulate_galaxies(nxyz, Lxyz, Ngalaxies, pk, kF, Δx, b, faH; rfftplan=default_plan(nxyz), rng=Random.GLOBAL_RNG)
+function simulate_galaxies(nxyz, Lxyz, Ngalaxies, pk, b, faH; rfftplan=default_plan(nxyz), rng=Random.GLOBAL_RNG)
     nx, ny, nz = nxyz
     Lx, Ly, Lz = Lxyz
     Volume = Lx * Ly * Lz
+    Δx = Lxyz ./ nxyz
+    kF = 2*π ./ Lxyz
 
     println("Convert pk to log-normal pkG...")
     #kln = readdlm("$root/data/fog_r1000_pkG.dat")[:,1]
@@ -302,9 +304,8 @@ function simulate_galaxies(nxyz, Lxyz, Ngalaxies, pk, kF, Δx, b, faH; rfftplan=
     #@show get_rank(),deltak_phases[1,1,1],mean(deltak_phases)
 
     println("Calculate kmode...")
-    @time kmode = calc_kmode(nx, ny, nz, kF, pencil(deltak_phases))
+    @time kmode = calc_kmode(kF, pencil(deltak_phases))
     #@show get_rank(),kmode[1,1,1],mean(kmode)
-    Volume = (2π / kF)^3
 
     println("Calculate deltak{m,g}...")
     deltakm = deepcopy(deltak_phases)
@@ -388,22 +389,27 @@ end
 
 function simulate_galaxies(nbar, Lbox, pk; nmesh=256, bias=1.0, f=0.0,
         rfftplanner=default_plan, rng=Random.GLOBAL_RNG)
-    b = bias
-    L = Lbox
-    Ngalaxies = ceil(Int, L^3 * nbar)
 
-    n = nmesh
-    kF = 2π/L
-    Δx = L/n
+    if nmesh isa Number
+        nxyz = nmesh, nmesh, nmesh
+    else
+        nxyz = nmesh
+    end
 
-    nxyz = n, n, n
-    Lxyz = L, L, L
+    if Lbox isa Number
+        Lxyz = Lbox, Lbox, Lbox
+    else
+        Lxyz = Lbox
+    end
+
+    Volume = prod(Lxyz)
+    Ngalaxies = ceil(Int, Volume * nbar)
 
     rfftplan = rfftplanner(nxyz)
 
-    xyzv = simulate_galaxies(nxyz, Lxyz, Ngalaxies, pk, kF, Δx, b, f;
+    xyzv = simulate_galaxies(nxyz, Lxyz, Ngalaxies, pk, bias, f;
                                    rfftplan, rng)
-    xyz = @. xyzv[1:3,:] - Float32(L / 2)
+    xyz = @. xyzv[1:3,:] - Float32(Lbox / 2)
     v = xyzv[4:6,:]
     return xyz, v
 end

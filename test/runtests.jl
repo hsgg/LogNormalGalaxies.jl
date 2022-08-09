@@ -113,7 +113,7 @@ function test_draw_galaxies_with_velocities()
     vy = randn(nnn...) / 10
     vz = randn(nnn...) / 10
     Ngalaxies = 1_000_000
-    Δx = 1.0
+    Δx = [1.0, 1.0, 1.0]
     @time xyzv = LogNormalGalaxies.draw_galaxies_with_velocities(deltar, vx, vy, vz, Ngalaxies, Δx)
     @time xyzv = LogNormalGalaxies.draw_galaxies_with_velocities(deltar, vx, vy, vz, Ngalaxies, Δx)
     @time xyzv = LogNormalGalaxies.draw_galaxies_with_velocities(deltar, vx, vy, vz, Ngalaxies, Δx)
