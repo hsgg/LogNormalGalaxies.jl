@@ -38,9 +38,9 @@ julia> pk(k)  # a power spectrum.
 
 julia> x, psi = simulate_galaxies(nbar, Lbox, pk; nmesh=256, bias=1.0, f=1.0)
 ```
-The parameter `nmesh` is the size of the mesh and the bias is the linear galaxy
+The parameter `nmesh` is the size of the mesh and `bias` is the linear galaxy
 bias. `x` is of size `(3,num_galaxies)` and the position vector of the galaxy
-`i` is `x[:,i]`. If `f=1`, then `v` will be the displacement field.
+`i` is `x[:,i]`. If `f=1`, then `psi` will be the displacement field.
 
 Thus, redshift space distortions can be added with code like
 ```julia
