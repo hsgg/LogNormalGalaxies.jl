@@ -57,3 +57,9 @@ end
 ```
 where we assumed the line of sight along the z-axis, and `f` is the linear
 growth rate `f=d\ln D/d\ln a`.
+
+It is a good idea to generate a catalog in a box that is somewhat larger than
+desired, and, after applying RSD, cut it down to the desired size. This is
+because RSD will always leave a region near the edges of the box incomplete as
+galaxies get scattered outside the box, but no galaxies get scattered inside
+the box.
