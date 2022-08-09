@@ -55,4 +55,5 @@ for i=1:num_galaxies
     x[:,i] .+= f * (psi[:,i]' * los) * los
 end
 ```
-where we assumed the line of sight along the z-axis.
+where we assumed the line of sight along the z-axis, and `f` is the linear
+growth rate `f=d\ln D/d\ln a`.
