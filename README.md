@@ -19,7 +19,9 @@ A sample script is in `test/test_lognormals.jl`. On the REPL it can be called wi
 include("path/to/LogNormalGalaxies/test/test_lognormals.jl")
 ```
 
-May need to configure [MPI.jl](https://juliaparallel.github.io/MPI.jl/stable/configuration/).
+May need to configure
+[MPI.jl](https://juliaparallel.github.io/MPI.jl/stable/configuration/).
+(Usually, `]build MPI` is sufficient.)
 
 
 ## Usage
