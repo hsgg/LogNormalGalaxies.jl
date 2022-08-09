@@ -1,6 +1,12 @@
 # LogNormalGalaxies.jl
 
 
+This Julia package implements a simple log-normal galaxies simulation, similar
+to as explained in [Agrawal etal (2017)](https://arxiv.org/abs/1706.09195).
+
+
+## Installation
+
 To install, first press `]` at the REPL to get into the package mode. Then, add the registry and the package,
 ```julia
 pkg> regsitry add https://github.com/Wide-Angle-Team/WATCosmologyJuliaRegistry.git
@@ -14,3 +20,32 @@ include("path/to/LogNormalGalaxies/test/test_lognormals.jl")
 ```
 
 May need to configure [MPI.jl](https://juliaparallel.github.io/MPI.jl/stable/configuration/).
+
+
+## Usage
+
+To generate a log-normal catalog, use `simulate_galaxies()`:
+```julia
+julia> using LogNormalGalaxies
+
+julia> nbar = 3e-4  # average number density per (Mpc/h)^3
+
+julia> Lbox = 2048.0  # box side length in Mpc/h
+
+julia> pk(k)  # a power spectrum.
+
+julia> x, psi = simulate_galaxies(nbar, Lbox, pk; nmesh=256, bias=1.0, f=1.0)
+```
+The parameter `nmesh` is the size of the mesh and the bias is the linear galaxy
+bias. `x` is of size `(3,num_galaxies)` and the position vector of the galaxy
+`i` is `x[:,i]`. If `f=1`, then `v` will be the displacement field.
+
+Thus, redshift space distortions can be added with code like
+```julia
+num_galaxies = size(x,2)
+los = [0, 0, 1]
+for i=1:num_galaxies
+    x[:,i] .+= f * (psi[:,i]' * los) * los
+end
+```
+where we assumed the line of sight along the z-axis.
