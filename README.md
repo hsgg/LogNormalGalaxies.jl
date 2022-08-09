@@ -36,11 +36,16 @@ julia> Lbox = 2048.0  # box side length in Mpc/h
 
 julia> pk(k)  # a power spectrum.
 
-julia> x, psi = simulate_galaxies(nbar, Lbox, pk; nmesh=256, bias=1.0, f=1.0)
+julia> x, psi = simulate_galaxies(nbar, Lbox, pk; nmesh=256, bias=1.0)
 ```
 The parameter `nmesh` is the size of the mesh and `bias` is the linear galaxy
 bias. `x` is of size `(3,num_galaxies)` and the position vector of the galaxy
-`i` is `x[:,i]`. If `f=1`, then `psi` will be the displacement field.
+`i` is `x[:,i]`. `psi` is the displacement field.
+
+There is a named parameters `f` that is used to multiply the displacement
+field. It should be left at `f=1`. However, if `f=0`, then the relatively
+expensive calculation to generate `psi` can be skipped (since `psi=0` in that
+case). This is useful if RSD is not needed.
 
 Thus, redshift space distortions can be added with code like
 ```julia
