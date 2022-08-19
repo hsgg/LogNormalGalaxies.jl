@@ -100,7 +100,7 @@ function main(fbase, rfftplanner=LogNormalGalaxies.plan_with_fftw)
 
     nbar = 3e-4
     L = 3e3
-    n = 128
+    n = 256
     #Random.seed!(8143083339)  # don't initialize all MPI processes with the same seed!
 
     println("Running with $(rfftplanner)...")

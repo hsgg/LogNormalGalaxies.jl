@@ -132,9 +132,30 @@ function test_array_deepcopy()
 end
 
 
+function test_anyspline()
+    println("Test any typed spline:")
+    # Someone may give other data types than Float64 to the module. Let's be
+    # able to handle that.
+    data = readdlm((@__DIR__)*"/matterpower.dat")
+    pk = Spline1D(data[2:end,1], data[2:end,2], extrapolation=Splines.powerlaw)
+    @show typeof(data)
+    @show typeof(pk)
+    @show pk(0.01)
+
+    k, pkG = LogNormalGalaxies.pk_to_pkG(pk)
+
+    nbar = 3e-4
+    L = 1000.0
+    n = 64
+    b = 1.0
+    f = 1
+    x⃗, Ψ = simulate_galaxies(nbar, L, pk; nmesh=n, bias=b, f=1, rfftplanner=LogNormalGalaxies.plan_with_fftw)
+end
+
+
 
 function main()
-    @testset "LogNormalGalaxies" begin
+    @testset "unit tests" begin
         test_pk_to_pkG(0.1)
         test_pk_to_pkG(1.0)
         compile_and_load()
@@ -143,6 +164,7 @@ function main()
         test_cutoff_pk()
         test_draw_galaxies_with_velocities()
         test_array_deepcopy()
+        test_anyspline()
     end
 end
 
@@ -150,8 +172,11 @@ end
 end
 
 
-TestLogNormalGalaxies.main()
-include("lognormals_50sims.jl")
+using Test
+@testset "LogNormalGalaxies" begin
+    TestLogNormalGalaxies.main()
+    include("lognormals_50sims.jl")
+end
 
 
 # vim: set sw=4 et sts=4 :

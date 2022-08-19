@@ -347,23 +347,23 @@ function get_abcdh(spline, i, x)
 end
 
 
-function eval_last(spline::Spline1D{3,T}, i, x)::T where {T}
+function eval_last(spline::Spline1D{3}, i, x)
     @inbounds a, b, c, d, h = spline.last_abcdh
     @inbounds x0 = spline.x[i]
     t = (x - x0) / h
     return @evalpoly(t, d, c, b, a)
 end
 
-function eval_i(spline::Spline1D{3,T}, i, x)::T where {T}
-	a, b, c, d, t, h = get_abcdh(spline, i, T(x))
+function eval_i(spline::Spline1D{3}, i, x)
+	a, b, c, d, t, h = get_abcdh(spline, i, x)
 	return @evalpoly(t, d, c, b, a)
 end
 
 
-function evaluate(spline::Spline1D{3,T}, x::Number)::T where {T}
+function evaluate(spline::Spline1D{3}, x::Number)
         ilast = spline.ilast[]
-        i = findlargestsmaller(spline.x, T(x), spline)
-        (i < 1 || i >= length(spline.x)) && return evaluate_past_boundary(spline, T(x))
+        i = findlargestsmaller(spline.x, x, spline)
+        (i < 1 || i >= length(spline.x)) && return evaluate_past_boundary(spline, x)
         (i == ilast) && return eval_last(spline, i, x)
         return eval_i(spline, i, x)
 end
