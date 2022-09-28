@@ -42,10 +42,10 @@ The parameter `nmesh` is the size of the mesh and `bias` is the linear galaxy
 bias. `x` is of size `(3,num_galaxies)` and the position vector of the galaxy
 `i` is `x[:,i]`. `psi` is the displacement field.
 
-There is a named parameters `f` that is used to multiply the displacement
-field. It should be left at `f=1`. However, if `f=0`, then the relatively
-expensive calculation to generate `psi` can be skipped (since `psi=0` in that
-case). This is useful if RSD is not needed.
+There is a named parameter `f` that is used to multiply the displacement
+field. It is best though of as a boolean. It should be left at `f=true`. If
+`f=false`, then the relatively expensive calculation to generate `psi` can be
+skipped (since `psi=0` in that case). This is useful if RSD is not needed.
 
 Redshift space distortions can be added with code like
 ```julia

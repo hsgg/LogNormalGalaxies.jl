@@ -387,7 +387,7 @@ function simulate_galaxies(nxyz, Lxyz, Ngalaxies, pk, b, faH; rfftplan=default_p
 end
 
 
-function simulate_galaxies(nbar, Lbox, pk; nmesh=256, bias=1.0, f=0.0,
+function simulate_galaxies(nbar, Lbox, pk; nmesh=256, bias=1.0, f=false,
         rfftplanner=default_plan, rng=Random.GLOBAL_RNG)
 
     if nmesh isa Number
