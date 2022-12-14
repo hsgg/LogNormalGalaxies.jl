@@ -100,7 +100,7 @@ function draw_phases(rfftplan; rng=Random.GLOBAL_RNG)
 end
 
 
-function multiply_by_pk!(deltak, pkfn, kF, Volume)
+function iterate_kspace(func, deltak, kF)
     nx2, ny, nz = size(deltak)
     ny2 = div(ny,2) + 1
     nz2 = div(nz,2) + 1
@@ -112,6 +112,16 @@ function multiply_by_pk!(deltak, pkfn, kF, Volume)
         kx = kF[1] * (ig - 1)
         ky = kF[2] * (jg <= ny2 ? jg-1 : jg-1-ny)
         kz = kF[3] * (kg <= nz2 ? kg-1 : kg-1-nz)
+        kvec = (kx,ky,kz)
+        func(i, j, k, kvec)
+    end
+    return deltak
+end
+
+
+function multiply_by_pk!(deltak, pkfn, kF, Volume)
+    iterate_kspace(deltak, kF) do i,j,k,kvec
+        kx, ky, kz = kvec
         kmode = √(kx^2 + ky^2 + kz^2)
         pk = pkfn(kmode)
         deltak[i,j,k] *= √(pk * Volume)
@@ -120,25 +130,14 @@ function multiply_by_pk!(deltak, pkfn, kF, Volume)
 end
 
 
-####################### calculate volocity field #################
 function calc_velocity_component!(deltak, kF, coord)
-    nx2, ny, nz = size_global(deltak)
-    ny2 = div(ny,2) + 1
-    nz2 = div(nz,2) + 1
-    localrange = range_local(deltak)
-    for k=1:size(deltak,3), j=1:size(deltak,2), i=1:size(deltak,1)
-        ig = localrange[1][i]  # global index of local index i
-        jg = localrange[2][j]  # global index of local index j
-        kg = localrange[3][k]  # global index of local index k
-        kx = kF[1] * (ig - 1)
-        ky = kF[2] * (jg <= ny2 ? jg-1 : jg-1-ny)
-        kz = kF[3] * (kg <= nz2 ? kg-1 : kg-1-nz)
-        kmode = √(kx^2 + ky^2 + kz^2)
-        if kmode == 0
+    iterate_kspace(deltak, kF) do i,j,k,kvec
+        kx, ky, kz = kvec
+        kmode2 = kx^2 + ky^2 + kz^2
+        if kmode2 == 0
             deltak[i,j,k] = 0
         else
-            vk_part = im / kmode^2 * deltak[i,j,k]
-            kvec = (kx,ky,kz)
+            vk_part = im / kmode2 * deltak[i,j,k]
             deltak[i,j,k] = kvec[coord] * vk_part
         end
     end
