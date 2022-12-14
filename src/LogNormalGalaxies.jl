@@ -25,6 +25,8 @@ using Statistics
 using PoissonRandom
 using TwoFAST
 using Random
+using Strided
+using LinearAlgebra
 
 
 using .Splines
@@ -55,15 +57,17 @@ end
 # choose fft plan
 
 function plan_with_fftw(nxyz)
+    FFTW.set_num_threads(Threads.nthreads())
     return plan_rfft(Array{Float64}(undef, nxyz...))
 end
 
 function plan_with_pencilffts(nxyz)
     rank, comm = start_mpi()
 
-    proc_dims = tuple(MPI.Dims_create!(MPI.Comm_size(comm), zeros(Int, 2))...)
+    proc_dims = MPI.Dims_create(MPI.Comm_size(comm), zeros(Int, 2))
+    proc_dims = tuple(Int64.(proc_dims)...)
     transform = Transforms.RFFT()
-    @show proc_dims
+    @show proc_dims typeof(proc_dims)
 
     @time rfftplan = PencilFFTPlan((nxyz...,), transform, proc_dims, comm)
     return rfftplan
@@ -83,11 +87,11 @@ function draw_phases(rfftplan; rng=Random.GLOBAL_RNG)
     #@show mean(deltar),var_global(deltar)
     #@assert !isnan(mean(deltar))
 
-    @time deltak_phases = rfftplan * deltar
+    deltak_phases = rfftplan * deltar
     #@show mean(deltak_phases)
     #@assert !isnan(mean(deltak_phases))
 
-    @. deltak_phases /= abs(deltak_phases)
+    @strided @. deltak_phases /= abs(deltak_phases)
     #@show mean(deltak_phases)
     #@assert !isnan(mean(deltak_phases))
     #@show sizeof_global(deltak_phases)/1024^3
@@ -96,33 +100,31 @@ function draw_phases(rfftplan; rng=Random.GLOBAL_RNG)
 end
 
 
-function calc_kmode(kF, pencil_δk)
-    kmode = allocate_array(pencil_δk, Float64)
-    nx2, ny, nz = size(kmode)
+function multiply_by_pk!(deltak, pkfn, kF, Volume)
+    nx2, ny, nz = size(deltak)
     ny2 = div(ny,2) + 1
     nz2 = div(nz,2) + 1
-    localrange = range_local(kmode)
-    for k=1:size(kmode,3), j=1:size(kmode,2), i=1:size(kmode,1)
+    localrange = range_local(deltak)
+    for k=1:size(deltak,3), j=1:size(deltak,2), i=1:size(deltak,1)
         ig = localrange[1][i]  # global index of local index i
         jg = localrange[2][j]  # global index of local index j
         kg = localrange[3][k]  # global index of local index k
-        ikx = ig - 1
-        iky = jg <= ny2 ? jg-1 : jg-1-ny
-        ikz = kg <= nz2 ? kg-1 : kg-1-nz
-        kmode[i,j,k] = √((kF[1]*ikx)^2 + (kF[2]*iky)^2 + (kF[3]*ikz)^2)
+        kx = kF[1] * (ig - 1)
+        ky = kF[2] * (jg <= ny2 ? jg-1 : jg-1-ny)
+        kz = kF[3] * (kg <= nz2 ? kg-1 : kg-1-nz)
+        kmode = √(kx^2 + ky^2 + kz^2)
+        pk = pkfn(kmode)
+        deltak[i,j,k] *= √(pk * Volume)
     end
-    return kmode
+    return deltak
 end
 
 
 ####################### calculate volocity field #################
-function calculate_velocities_faH(deltak, kF)
+function calc_velocity_component!(deltak, kF, coord)
     nx2, ny, nz = size_global(deltak)
     ny2 = div(ny,2) + 1
     nz2 = div(nz,2) + 1
-    vkx = similar(deltak)
-    vky = similar(deltak)
-    vkz = similar(deltak)
     localrange = range_local(deltak)
     for k=1:size(deltak,3), j=1:size(deltak,2), i=1:size(deltak,1)
         ig = localrange[1][i]  # global index of local index i
@@ -133,17 +135,14 @@ function calculate_velocities_faH(deltak, kF)
         kz = kF[3] * (kg <= nz2 ? kg-1 : kg-1-nz)
         kmode = √(kx^2 + ky^2 + kz^2)
         if kmode == 0
-            vkx[i,j,k] = 0
-            vky[i,j,k] = 0
-            vkz[i,j,k] = 0
+            deltak[i,j,k] = 0
         else
             vk_part = im / kmode^2 * deltak[i,j,k]
-            vkx[i,j,k] = kx * vk_part
-            vky[i,j,k] = ky * vk_part
-            vkz[i,j,k] = kz * vk_part
+            kvec = (kx,ky,kz)
+            deltak[i,j,k] = kvec[coord] * vk_part
         end
     end
-    return vkx, vky, vkz
+    return deltak
 end
 
 
@@ -284,7 +283,7 @@ end
 # their interface.
 
 # simulate galaxies
-function simulate_galaxies(nxyz, Lxyz, Ngalaxies, pk, b, faH; rfftplan=default_plan(nxyz), rng=Random.GLOBAL_RNG)
+function simulate_galaxies(nxyz, Lxyz, Ngalaxies, pk, b, faH; rfftplan=default_plan(nxyz), rng=Random.GLOBAL_RNG, extra_test=false)
     nx, ny, nz = nxyz
     Lx, Ly, Lz = Lxyz
     Volume = Lx * Ly * Lz
@@ -292,48 +291,26 @@ function simulate_galaxies(nxyz, Lxyz, Ngalaxies, pk, b, faH; rfftplan=default_p
     kF = 2*π ./ Lxyz
 
     println("Convert pk to log-normal pkG...")
-    #kln = readdlm("$root/data/fog_r1000_pkG.dat")[:,1]
-    #pkGln = readdlm("$root/data/fog_r1000_pkG.dat")[:,2]
     @time kGm, pkGm = pk_to_pkG(pk)
     @time kGg, pkGg = pk_to_pkG(k -> b^2 * pk(k))
-    #@show pkGm.([0.0,1.0])
-    #@show pkGg.([0.0,1.0])
 
     println("Draw random phases...")
-    @time deltak_phases = draw_phases(rfftplan; rng)
-    #@show get_rank(),deltak_phases[1,1,1],mean(deltak_phases)
-
-    println("Calculate kmode...")
-    @time kmode = calc_kmode(kF, pencil(deltak_phases))
-    #@show get_rank(),kmode[1,1,1],mean(kmode)
+    @time deltakm = draw_phases(rfftplan; rng)
 
     println("Calculate deltak{m,g}...")
-    deltakm = deepcopy(deltak_phases)
-    deltakg = deltak_phases
-    #@show get_rank(),deltakm[1,1,1],mean(deltakm)
-    #@show get_rank(),deltakg[1,1,1],mean(deltakg)
-    @time @. deltakm *= √(pkGm(kmode) * Volume)
-    for i in eachindex(kmode)
-        if pkGg(kmode[i]) < 0
-	    @error "negative pkGg" i kmode[i] pkGg(kmode[i])
-            error("negative pkGg")
-        end
-    end
-    @time @. deltakg *= √(pkGg(kmode) * Volume)
+    @time deltakg = deepcopy(deltakm)
+    @time multiply_by_pk!(deltakg, pkGg, kF, Volume)
+    @time multiply_by_pk!(deltakm, pkGm, kF, Volume)
     ##@time pixel_window!(deltakm, nxyz)
     #@time pixel_window!(deltakg, nxyz)
-    deltak_phases = nothing
-    kmode = nothing
-    #@show get_rank(),deltakm[1,1,1],mean(deltakm)
-    #@show get_rank(),deltakg[1,1,1],mean(deltakg)
 
     println("Calculate deltar{m,g}...")
     @time deltarm = rfftplan \ deltakm
     @time deltarg = rfftplan \ deltakg
     #@show get_rank(),"interim",deltarm[1,1,1],mean(deltakm)
     #@show get_rank(),"interim",deltarg[1,1,1],mean(deltakg)
-    @. deltarm *= (nx*ny*nz) / Volume
-    @. deltarg *= (nx*ny*nz) / Volume
+    @time @strided @. deltarm *= (nx*ny*nz) / Volume
+    @time @strided @. deltarg *= (nx*ny*nz) / Volume
     #@show get_rank(),deltarm[1,1,1],mean(deltakm)
     #@show get_rank(),deltarg[1,1,1],mean(deltakg)
     deltakg = nothing
@@ -351,8 +328,8 @@ function simulate_galaxies(nxyz, Lxyz, Ngalaxies, pk, b, faH; rfftplan=default_p
     #@show σGg²,σGg²_th,σGg²/σGg²_th
     #@show var(deltarg)
     #return
-    @time @. deltarm = exp(deltarm - σGm²/2) - 1
-    @time @. deltarg = exp(deltarg - σGg²/2) - 1
+    @time @strided @. deltarm = exp(deltarm - σGm²/2) - 1
+    @time @strided @. deltarg = exp(deltarg - σGg²/2) - 1
     #@show σGm² σGg²
     #@show mean(deltarm),std(deltarm)
     #@show extrema(deltarm)
@@ -361,28 +338,37 @@ function simulate_galaxies(nxyz, Lxyz, Ngalaxies, pk, b, faH; rfftplan=default_p
 
     if faH != 0
         println("Calculate deltakm...")
-        @time deltakm = rfftplan * deltarm
-        @. deltakm *= Volume / (nx*ny*nz)
+        @time mul!(deltakm, rfftplan, deltarm)
+        @time @strided @. deltakm *= Volume / (nx*ny*nz)
         deltarm = nothing
-        println("Calculate v⃗(k⃗)...")
-        @time vkx, vky, vkz = calculate_velocities_faH(deltakm, kF)
+
+        println("Calculate vx...")
+        vki = deepcopy(deltakm)
+        @time calc_velocity_component!(vki, kF, 1)
+        @time vx = rfftplan \ vki
+        @time @strided @. vx *= faH * (nx*ny*nz) / Volume
+
+        println("Calculate vy...")
+        @time @strided @. vki = deltakm
+        @time calc_velocity_component!(vki, kF, 2)
+        @time vy = rfftplan \ vki
+        @time @strided @. vy *= faH * (nx*ny*nz) / Volume
+
+        println("Calculate vz...")
+        @time @strided @. vki = deltakm
+        @time calc_velocity_component!(vki, kF, 3)
+        @time vz = rfftplan \ vki
+        @time @strided @. vz *= faH * (nx*ny*nz) / Volume
+
+        vki = nothing  # free memory
         deltakm = nothing  # free memory
-        println("Calculate v⃗(r⃗)...")
-        @time vx = rfftplan \ vkx
-        @. vx *= faH * (nx*ny*nz) / Volume
-        vkx = nothing  # free memory
-        @time vy = rfftplan \ vky
-        @. vy *= faH * (nx*ny*nz) / Volume
-        vky = nothing  # free memory
-        @time vz = rfftplan \ vkz
-        @. vz *= faH * (nx*ny*nz) / Volume
-        vkz = nothing  # free memory
     else
         vx = vy = vz = 0
     end
 
     println("Draw galaxies...")
     @time xyzv = draw_galaxies_with_velocities(deltarg, vx, vy, vz, Ngalaxies, Δx; rng)
+    @show Sys.maxrss() / 2^30
     return xyzv
 end
 
@@ -405,12 +391,13 @@ function simulate_galaxies(nbar, Lbox, pk; nmesh=256, bias=1.0, f=false,
     Volume = prod(Lxyz)
     Ngalaxies = ceil(Int, Volume * nbar)
 
-    rfftplan = rfftplanner(nxyz)
+    @time rfftplan = rfftplanner(nxyz)
 
-    xyzv = simulate_galaxies(nxyz, Lxyz, Ngalaxies, pk, bias, f;
+    @time xyzv = simulate_galaxies(nxyz, Lxyz, Ngalaxies, pk, bias, f;
                                    rfftplan, rng)
-    xyz = @. xyzv[1:3,:] - Float32(Lbox / 2)
-    v = xyzv[4:6,:]
+    println("Post-processing...")
+    @time xyz = @. xyzv[1:3,:] - Float32(Lbox / 2)
+    @time v = xyzv[4:6,:]
     return xyz, v
 end
 
