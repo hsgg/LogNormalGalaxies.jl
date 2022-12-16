@@ -23,18 +23,18 @@ function compile_and_load()
     nbar = 3e-4
     L = 2e3
     ΔL = 50.0  # buffer for RSD
-    n = 768
+    n = 64
     #Random.seed!(8143083339)
 
     # generate catalog
     @time x⃗, Ψ = simulate_galaxies(nbar, L+ΔL, pk; nmesh=n, bias=b, f=1, rfftplanner=LogNormalGalaxies.plan_with_fftw)
-    #@time x⃗2, Ψ2 = simulate_galaxies(nbar, L+ΔL, pk; nmesh=n, bias=b, f=1, rfftplanner=LogNormalGalaxies.plan_with_pencilffts)
+    @time x⃗2, Ψ2 = simulate_galaxies(nbar, L+ΔL, pk; nmesh=n, bias=b, f=1, rfftplanner=LogNormalGalaxies.plan_with_pencilffts)
     @show size(x⃗), size(Ψ)
-    #@show size(x⃗2), size(Ψ2)
+    @show size(x⃗2), size(Ψ2)
     @test typeof(x⃗) <: Array{Float32}
     @test typeof(Ψ) <: Array{Float32}
-    #@test typeof(x⃗2) <: Array{Float32}
-    #@test typeof(Ψ2) <: Array{Float32}
+    @test typeof(x⃗2) <: Array{Float32}
+    @test typeof(Ψ2) <: Array{Float32}
 end
 
 
