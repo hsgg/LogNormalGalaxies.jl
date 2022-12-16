@@ -15,6 +15,7 @@ allocate_array(pen::Pencil, type::DataType) = PencilArray{type}(undef, Pencil(pe
 ############### functions to extend PencilArrays ####
 
 Base.deepcopy(pa::PencilArray) = PencilArray(pencil(pa), deepcopy(parent(pa)))
+Strided.StridedView(a::PencilArray) = Strided.StridedView(parent(a))  # FIXME: incomplete if there are permutations. To fix, need to figure out how to get the permutated view.
 
 
 ############### functions to extend base Arrays ####
