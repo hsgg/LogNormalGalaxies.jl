@@ -57,7 +57,6 @@ end
 # choose fft plan
 
 function plan_with_fftw(nxyz)
-    FFTW.set_num_threads(Threads.nthreads())
     return plan_rfft(Array{Float64}(undef, nxyz...))
 end
 
