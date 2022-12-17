@@ -138,8 +138,7 @@ function calc_velocity_component!(deltak, kF, coord)
         if kmode2 == 0
             deltak[i,j,k] = 0
         else
-            vk_part = im / kmode2 * deltak[i,j,k]
-            deltak[i,j,k] = kvec[coord] * vk_part
+            deltak[i,j,k] *= im * kvec[coord] / kmode2
         end
     end
     return deltak
@@ -337,28 +336,34 @@ function simulate_galaxies(nxyz, Lxyz, Ngalaxies, pk, b, faH; rfftplan=default_p
     #@show extrema(deltarg)
 
     if faH != 0
+        # Note: In this section we ignore the Volume/(nx*ny*nz) multiplication
+        # because it cancels.
+
+        # Note2: The velocity should be multiplied by faH. We do that later. In
+        # any case, we are really calculating the displacement field, so faH=1.
+
         println("Calculate deltakm...")
         @time mul!(deltakm, rfftplan, deltarm)
-        @time @strided @. deltakm *= Volume / (nx*ny*nz)
+        #@time @strided @. deltakm *= Volume / (nx*ny*nz)
         deltarm = nothing
 
         println("Calculate vx...")
         vki = deepcopy(deltakm)
         @time calc_velocity_component!(vki, kF, 1)
         @time vx = rfftplan \ vki
-        @time @strided @. vx *= faH * (nx*ny*nz) / Volume
+        #@time @strided @. vx *= faH * (nx*ny*nz) / Volume
 
         println("Calculate vy...")
         @time @strided @. vki = deltakm
         @time calc_velocity_component!(vki, kF, 2)
         @time vy = rfftplan \ vki
-        @time @strided @. vy *= faH * (nx*ny*nz) / Volume
+        #@time @strided @. vy *= faH * (nx*ny*nz) / Volume
 
         println("Calculate vz...")
         @time @strided @. vki = deltakm
         @time calc_velocity_component!(vki, kF, 3)
         @time vz = rfftplan \ vki
-        @time @strided @. vz *= faH * (nx*ny*nz) / Volume
+        #@time @strided @. vz *= faH * (nx*ny*nz) / Volume
 
         vki = nothing  # free memory
         deltakm = nothing  # free memory
@@ -368,6 +373,11 @@ function simulate_galaxies(nxyz, Lxyz, Ngalaxies, pk, b, faH; rfftplan=default_p
 
     println("Draw galaxies...")
     @time xyzv = draw_galaxies_with_velocities(deltarg, vx, vy, vz, Ngalaxies, Δx; rng)
+
+    if faH != 1 && faH != 0
+        @time @strided @. xyzv[4:6,:] *= faH
+    end
+
     @show Sys.maxrss() / 2^30
     return xyzv
 end
