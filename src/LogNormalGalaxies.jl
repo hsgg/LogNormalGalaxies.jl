@@ -102,7 +102,7 @@ end
 function iterate_kspace(func, deltak, kF)
     # Note: Be careful parallelizing this, because 'func()' may call
     # thread-unsafe functions, like Spline1D.
-    nx2, ny, nz = size(deltak)
+    nx2, ny, nz = size_global(deltak)
     ny2 = div(ny,2) + 1
     nz2 = div(nz,2) + 1
     localrange = range_local(deltak)
