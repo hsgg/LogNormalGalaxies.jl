@@ -79,8 +79,8 @@ function generate_sims(pk, nbar, b, f, L, n_sim, n_est, nrlz; rfftplanner=LogNor
         @. pkm[:,:,rlz] = pkmi
     end
 
-    pkm_err = std(pkm, dims=3)
-    pkm = mean(pkm, dims=3)
+    pkm_err = std(pkm, dims=3)[:,:,1]
+    pkm = mean(pkm, dims=3)[:,:,1]
     @show size(pkm) size(pkm_err)
 
     return km, pkm, nmodes, pkm_err
@@ -105,6 +105,14 @@ function main(fbase, rfftplanner=LogNormalGalaxies.plan_with_fftw)
 
     println("Running with $(rfftplanner)...")
     km, pkm, nmodes, pkm_err = generate_sims(pk, nbar, b, f, L, n_sim, n_est, nrlz; rfftplanner)
+
+    # save output for comparison
+    outdir = (@__DIR__) * "/output_current"
+    mkpath(outdir)
+    open("$outdir/pkl.tsv", "w") do f
+        write(f, "kh    pk0 pk1 pk2 pk3 pk4 nmodes\n")
+        writedlm(f, [km pkm nmodes])
+    end
 
     # theory
     β = f / b
