@@ -143,7 +143,13 @@ end # module
 
 lognormals.main("sims_fftw", LogNormalGalaxies.plan_with_fftw)
 
-lognormals.main("sims_pencilffts", LogNormalGalaxies.plan_with_pencilffts)
+if Sys.ARCH == :aarch64
+    @warn "Julia doesn't support MPI on ARM"
+    #@test_throws LoadError lognormals.main("sims_pencilffts", LogNormalGalaxies.plan_with_pencilffts)
+    #lognormals.main("sims_pencilffts", LogNormalGalaxies.plan_with_pencilffts)
+else
+    lognormals.main("sims_pencilffts", LogNormalGalaxies.plan_with_pencilffts)
+end
 
 
 # vim: set sw=4 et sts=4 :
