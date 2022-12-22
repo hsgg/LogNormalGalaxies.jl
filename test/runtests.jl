@@ -15,7 +15,7 @@ using BenchmarkTools
     @testset "Compile and load" for rfftplanner=[LogNormalGalaxies.plan_with_fftw,LogNormalGalaxies.plan_with_pencilffts]
         @show rfftplanner
         if Sys.ARCH == :aarch64 && rfftplanner == LogNormalGalaxies.plan_with_pencilffts
-            @warn "Skipping PencilFFTs on ARM64"
+            @test_skip "Skipping PencilFFTs on ARM64"
             continue
         end
 
