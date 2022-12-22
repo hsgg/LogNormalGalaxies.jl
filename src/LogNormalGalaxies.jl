@@ -362,7 +362,7 @@ function simulate_galaxies(nxyz, Lxyz, Ngalaxies, pk, b, faH; rfftplan=default_p
         deltarm = nothing
 
         println("Calculate vx...")
-        vki = deepcopy(deltakm)
+        @time vki = deepcopy(deltakm)
         @time calc_velocity_component!(vki, kF, 1)
         @time vx = rfftplan \ vki
         #@time @strided @. vx *= faH * (nx*ny*nz) / Volume

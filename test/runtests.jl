@@ -1,5 +1,6 @@
 #!/usr/bin/env julia
 
+using Revise
 
 module TestLogNormalGalaxies
 
@@ -153,6 +154,45 @@ function test_anyspline()
 end
 
 
+function test_reproducible_catalog(; rsd=true)
+    nbar = 1e-8
+    L = 1e3
+    nmesh = 32
+    bias = 1.5
+
+    keq = 2e-2
+    c = 3 * keq^4
+    a = 2e4 * 4 * keq^3
+    pk(k) = a * k / (c + k^4)
+
+    # Create separate random number generator, because task creation also uses
+    # the global RNG, so using that depends on the task-creation scheme.
+    rng = Random.Xoshiro()
+
+    Random.seed!(rng, 981670238674)
+    x⃗old = Float32[90.12323 -239.76099 -111.01846 207.76068 169.9992 -413.45624 -98.743225 321.521 -409.5943 -222.11697; 379.68872 -1.3737488 446.7375 -203.58994 206.53577 405.7047 444.58038 90.98395 317.6936 -431.44104; -494.18585 -379.7971 -395.80817 -359.86798 -358.05563 -337.06317 -336.2911 -165.63074 19.286865 195.81134]
+    if rsd
+        Ψold = Float32[0.4778329 3.219249 -1.6333185 -0.42805248 3.4687948 -4.5293393 -2.486782 0.5010775 0.012112802 1.8666419; -4.4531307 -1.2860316 2.3900015 -1.4083495 4.585397 10.149197 1.5276932 -4.7637467 -3.0302913 1.0205473; -2.4395022 5.5024977 0.15911977 0.015944915 -6.7924957 -2.0523155 -0.005055556 -2.3137286 3.6153123 -2.6358268]
+    else
+        Ψold = fill(Float32(0), size(x⃗old))
+    end
+
+    @time x⃗, Ψ = simulate_galaxies(nbar, L, pk; nmesh, bias, f=rsd, rng)
+    x⃗ = LogNormalGalaxies.concatenate_mpi_arr(x⃗)
+    Ψ = LogNormalGalaxies.concatenate_mpi_arr(Ψ)
+
+    @show size(x⃗) size(Ψ) x⃗ x⃗old Ψ Ψold
+    @show x⃗[:,2]
+    @show Ψ[:,2]
+    @test size(x⃗) == size(x⃗old)
+    @test size(Ψ) == size(Ψold)
+
+    for i=1:size(x⃗,2)
+        @test x⃗[:,i] ≈ x⃗old[:,i]  rtol=eps(Float32(L/2))
+        @test Ψ[:,i] ≈ Ψold[:,i]  rtol=eps(10f0)
+    end
+end
+
 
 function main()
     @testset "unit tests" begin
@@ -165,6 +205,8 @@ function main()
         test_array_deepcopy()
         test_anyspline()
         compile_and_load()
+        test_reproducible_catalog(; rsd=false)
+        test_reproducible_catalog(; rsd=true)
     end
 end
 
