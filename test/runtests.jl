@@ -5,9 +5,11 @@ using Revise
 using Test
 using LogNormalGalaxies
 using LogNormalGalaxies.Splines
+using MeasurePowerSpectra
 using DelimitedFiles
 using Random
 using BenchmarkTools
+using PyPlot
 
 
 @testset "LogNormalGalaxies" begin
@@ -194,6 +196,7 @@ using BenchmarkTools
     end
 
 
+    include("complementary_sims.jl")
     include("lognormals_50sims.jl")
 end
 

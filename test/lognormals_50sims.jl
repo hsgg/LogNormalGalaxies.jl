@@ -133,12 +133,18 @@ end
 
 end # module
 
-lognormals.main("sims_fftw", LogNormalGalaxies.plan_with_fftw)
 
-if Sys.ARCH == :aarch64
-    @test_skip "Skipping PencilFFTs on ARM64"
-else
-    lognormals.main("sims_pencilffts", LogNormalGalaxies.plan_with_pencilffts)
+@testset "Many sims FFTW" begin
+    lognormals.main("sims_fftw", LogNormalGalaxies.plan_with_fftw)
+end
+
+
+@testset "Many sims PencilFFTs" begin
+    if Sys.ARCH == :aarch64
+        @test_skip "Skipping PencilFFTs on ARM64"
+    else
+        lognormals.main("sims_pencilffts", LogNormalGalaxies.plan_with_pencilffts)
+    end
 end
 
 

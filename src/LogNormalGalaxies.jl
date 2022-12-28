@@ -295,59 +295,32 @@ end
 # Here are multiple functions called 'simulate_galaxies()'. They only differ in
 # their interface.
 
-# simulate galaxies
-function simulate_galaxies(nxyz, Lxyz, Ngalaxies, pk, b, faH; rfftplan=default_plan(nxyz), rng=Random.GLOBAL_RNG, extra_test=false)
+function phases_to_galaxies!(deltakm, nxyz, Lxyz, Ngalaxies, pkGm, pkGg; faH=true, rfftplan=default_plan(nxyz), rng=Random.GLOBAL_RNG)
     nx, ny, nz = nxyz
     Lx, Ly, Lz = Lxyz
     Volume = Lx * Ly * Lz
     Δx = Lxyz ./ nxyz
     kF = 2*π ./ Lxyz
 
-    println("Convert pk to log-normal pkG...")
-    @time kGm, pkGm = pk_to_pkG(pk)
-    @time kGg, pkGg = pk_to_pkG(k -> b^2 * pk(k))
-
-    println("Draw random phases...")
-    @time deltakm = draw_phases(rfftplan; rng)
-
     println("Calculate deltak{m,g}...")
     @time deltakg = deepcopy(deltakm)
     @time multiply_by_pk!(deltakg, pkGg, kF, Volume)
     @time multiply_by_pk!(deltakm, pkGm, kF, Volume)
-    ##@time pixel_window!(deltakm, nxyz)
-    #@time pixel_window!(deltakg, nxyz)
 
     println("Calculate deltar{m,g}...")
     @time deltarm = rfftplan \ deltakm
     @time deltarg = rfftplan \ deltakg
-    #@show get_rank(),"interim",deltarm[1,1,1],mean(deltakm)
-    #@show get_rank(),"interim",deltarg[1,1,1],mean(deltakg)
     @time @strided @. deltarm *= (nx*ny*nz) / Volume
     @time @strided @. deltarg *= (nx*ny*nz) / Volume
-    #@show get_rank(),deltarm[1,1,1],mean(deltakm)
-    #@show get_rank(),deltarg[1,1,1],mean(deltakg)
     deltakg = nothing
-    #@show mean(deltarm),std(deltarm)
-    #@show extrema(deltarm)
-    #@show mean(deltarg),std(deltarg)
-    #@show extrema(deltarg)
 
     println("Transform G → δ...")
     @time σGm² = var_global(deltarm)
     @time σGg² = var_global(deltarg)
     #σGm²_th = calculate_sigmaGsq(pkGm, prod(Lxyz ./ nxyz))
     #σGg²_th = calculate_sigmaGsq(pkGg, prod(Lxyz ./ nxyz))
-    #@show σGm²,σGm²_th,σGm²/σGm²_th
-    #@show σGg²,σGg²_th,σGg²/σGg²_th
-    #@show var(deltarg)
-    #return
     @time @strided @. deltarm = exp(deltarm - σGm²/2) - 1
     @time @strided @. deltarg = exp(deltarg - σGg²/2) - 1
-    #@show σGm² σGg²
-    #@show mean(deltarm),std(deltarm)
-    #@show extrema(deltarm)
-    #@show mean(deltarg),std(deltarg)
-    #@show extrema(deltarg)
 
     if faH != 0
         # Note: In this section we ignore the Volume/(nx*ny*nz) multiplication
@@ -397,8 +370,38 @@ function simulate_galaxies(nxyz, Lxyz, Ngalaxies, pk, b, faH; rfftplan=default_p
 end
 
 
+# simulate galaxies
+function simulate_galaxies(nxyz, Lxyz, Ngalaxies, pk, b, faH; rfftplan=default_plan(nxyz), rng=Random.GLOBAL_RNG, extra_phases=nothing)
+
+    println("Convert pk to log-normal pkG...")
+    @time kGm, pkGm = pk_to_pkG(pk)
+    @time kGg, pkGg = pk_to_pkG(k -> b^2 * pk(k))
+
+    println("Draw random phases...")
+    @time deltakm = draw_phases(rfftplan; rng)
+
+    allphases = [0.0]
+    if !isnothing(extra_phases)
+        append!(allphases, extra_phases)
+    end
+
+    xyzv = []
+    for phase in allphases
+        println("Calculating phase=$phase...")
+        deltakm_i = exp(im*phase) .* deltakm
+        xyzvi = phases_to_galaxies!(deltakm_i, nxyz, Lxyz, Ngalaxies, pkGm, pkGg; faH, rfftplan, rng)
+        push!(xyzv, xyzvi)
+    end
+
+    if isnothing(extra_phases)
+        return xyzv[1]
+    end
+    return xyzv
+end
+
+
 function simulate_galaxies(nbar, Lbox, pk; nmesh=256, bias=1.0, f=false,
-        rfftplanner=default_plan, rng=Random.GLOBAL_RNG)
+        rfftplanner=default_plan, rng=Random.GLOBAL_RNG, extra_phases=nothing)
 
     if nmesh isa Number
         nxyz = nmesh, nmesh, nmesh
@@ -418,11 +421,24 @@ function simulate_galaxies(nbar, Lbox, pk; nmesh=256, bias=1.0, f=false,
     @time rfftplan = rfftplanner(nxyz)
 
     @time xyzv = simulate_galaxies(nxyz, Lxyz, Ngalaxies, pk, bias, f;
-                                   rfftplan, rng)
+                                   rfftplan, rng, extra_phases)
+
+    if isnothing(extra_phases)
+        xyzv = [xyzv]
+    end
+
     println("Post-processing...")
-    @time xyz = @. xyzv[1:3,:] - Float32(Lbox / 2)
-    @time v = xyzv[4:6,:]
-    return xyz, v
+    catalogs = ()
+    for xv in xyzv
+        @time x = @. xv[1:3,:] - Float32(Lbox / 2)
+        @time v = xv[4:6,:]
+        catalogs = (catalogs..., (x, v))
+    end
+
+    if isnothing(extra_phases)
+        return catalogs[1]
+    end
+    return catalogs
 end
 
 
