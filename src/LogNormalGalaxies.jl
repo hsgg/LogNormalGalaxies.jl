@@ -295,24 +295,18 @@ end
 # Here are multiple functions called 'simulate_galaxies()'. They only differ in
 # their interface.
 
-function phases_to_galaxies!(deltakm, nxyz, Lxyz, Ngalaxies, pkGm, pkGg; faH=true, rfftplan=default_plan(nxyz), rng=Random.GLOBAL_RNG)
+function deltak_to_galaxies!(deltakm, deltakg, nxyz, Lxyz, Ngalaxies; faH=true, rfftplan=default_plan(nxyz), rng=Random.GLOBAL_RNG)
     nx, ny, nz = nxyz
     Lx, Ly, Lz = Lxyz
     Volume = Lx * Ly * Lz
     Δx = Lxyz ./ nxyz
     kF = 2*π ./ Lxyz
 
-    println("Calculate deltak{m,g}...")
-    @time deltakg = deepcopy(deltakm)
-    @time multiply_by_pk!(deltakg, pkGg, kF, Volume)
-    @time multiply_by_pk!(deltakm, pkGm, kF, Volume)
-
     println("Calculate deltar{m,g}...")
     @time deltarm = rfftplan \ deltakm
     @time deltarg = rfftplan \ deltakg
     @time @strided @. deltarm *= (nx*ny*nz) / Volume
     @time @strided @. deltarg *= (nx*ny*nz) / Volume
-    deltakg = nothing
 
     println("Transform G → δ...")
     @time σGm² = var_global(deltarm)
@@ -372,13 +366,15 @@ end
 
 # simulate galaxies
 function simulate_galaxies(nxyz, Lxyz, Ngalaxies, pk, b, faH; rfftplan=default_plan(nxyz), rng=Random.GLOBAL_RNG, extra_phases=nothing)
+    Volume = prod(Lxyz)
+    kF = 2*π ./ Lxyz
 
     println("Convert pk to log-normal pkG...")
     @time kGm, pkGm = pk_to_pkG(pk)
     @time kGg, pkGg = pk_to_pkG(k -> b^2 * pk(k))
 
     println("Draw random phases...")
-    @time deltakm = draw_phases(rfftplan; rng)
+    @time deltakm_init = draw_phases(rfftplan; rng)
 
     allphases = [0.0]
     if !isnothing(extra_phases)
@@ -388,8 +384,14 @@ function simulate_galaxies(nxyz, Lxyz, Ngalaxies, pk, b, faH; rfftplan=default_p
     xyzv = []
     for phase in allphases
         println("Calculating phase=$phase...")
-        deltakm_i = exp(im*phase) .* deltakm
-        xyzvi = phases_to_galaxies!(deltakm_i, nxyz, Lxyz, Ngalaxies, pkGm, pkGg; faH, rfftplan, rng)
+        deltakm = exp(im*phase) .* deltakm_init
+
+        println("Calculate deltak{m,g}...")
+        @time deltakg = deepcopy(deltakm)
+        @time multiply_by_pk!(deltakm, pkGm, kF, Volume)
+        @time multiply_by_pk!(deltakg, pkGg, kF, Volume)
+
+        xyzvi = deltak_to_galaxies!(deltakm, deltakg, nxyz, Lxyz, Ngalaxies; faH, rfftplan, rng)
         push!(xyzv, xyzvi)
     end
 
