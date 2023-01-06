@@ -90,11 +90,6 @@ function draw_phases(rfftplan; rng=Random.GLOBAL_RNG)
     #@show mean(deltak_phases)
     #@assert !isnan(mean(deltak_phases))
 
-    @strided @. deltak_phases /= abs(deltak_phases)
-    #@show mean(deltak_phases)
-    #@assert !isnan(mean(deltak_phases))
-    #@show sizeof_global(deltak_phases)/1024^3
-    #@show sizeof(rfftplan)
     return deltak_phases
 end
 
@@ -351,7 +346,8 @@ end
 
 
 # simulate galaxies
-function simulate_galaxies(nxyz, Lxyz, Ngalaxies, pk, b, faH; rfftplan=default_plan(nxyz), rng=Random.GLOBAL_RNG, extra_phases=nothing)
+function simulate_galaxies(nxyz, Lxyz, Ngalaxies, pk, b, faH; rfftplan=default_plan(nxyz),
+        rng=Random.GLOBAL_RNG, extra_phases=nothing, fixed=true)
     Volume = prod(Lxyz)
     nx, ny, nz = nxyz
     kF = 2*π ./ Lxyz
@@ -361,7 +357,10 @@ function simulate_galaxies(nxyz, Lxyz, Ngalaxies, pk, b, faH; rfftplan=default_p
     @time kGg, pkGg = pk_to_pkG(k -> b^2 * pk(k))
 
     println("Draw random phases...")
-    @time deltakm_init = draw_phases(rfftplan; rng)
+    @time deltak_phases = draw_phases(rfftplan; rng)
+    if fixed
+        @strided @. deltak_phases /= abs(deltak_phases)
+    end
 
     allphases = [0.0]
     if !isnothing(extra_phases)
@@ -371,10 +370,10 @@ function simulate_galaxies(nxyz, Lxyz, Ngalaxies, pk, b, faH; rfftplan=default_p
     xyzv = []
     for phase in allphases
         println("Calculating phase=$phase...")
-        deltakm = exp(im*phase) .* deltakm_init
+        @time deltakm = exp(im*phase) .* deltak_phases
+        @time deltakg = deepcopy(deltakm)
 
         println("Calculate deltak{m,g}...")
-        @time deltakg = deepcopy(deltakm)
         @time multiply_by_pk!(deltakm, pkGm, kF, Volume)
         @time multiply_by_pk!(deltakg, pkGg, kF, Volume)
 
@@ -408,8 +407,8 @@ end
 
 
 function simulate_galaxies(nbar, Lbox, pk; nmesh=256, bias=1.0, f=false,
-        rfftplanner=default_plan, rng=Random.GLOBAL_RNG, extra_phases=nothing,
-        gather=true)
+        rfftplanner=default_plan, extra_phases=nothing, gather=true,
+        kwargs...)
 
     if nmesh isa Number
         nxyz = nmesh, nmesh, nmesh
@@ -429,7 +428,7 @@ function simulate_galaxies(nbar, Lbox, pk; nmesh=256, bias=1.0, f=false,
     @time rfftplan = rfftplanner(nxyz)
 
     @time xyzv = simulate_galaxies(nxyz, Lxyz, Ngalaxies, pk, bias, f;
-                                   rfftplan, rng, extra_phases)
+                                   rfftplan, extra_phases, kwargs...)
 
     if isnothing(extra_phases)
         xyzv = [xyzv]
