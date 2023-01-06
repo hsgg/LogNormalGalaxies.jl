@@ -295,26 +295,12 @@ end
 # Here are multiple functions called 'simulate_galaxies()'. They only differ in
 # their interface.
 
-function deltak_to_galaxies!(deltakm, deltakg, nxyz, Lxyz, Ngalaxies; faH=true, rfftplan=default_plan(nxyz), rng=Random.GLOBAL_RNG)
+function deltak_to_galaxies!(deltarm, deltarg, nxyz, Lxyz, Ngalaxies, pkGm, pkGg; faH=true, rfftplan=default_plan(nxyz), rng=Random.GLOBAL_RNG)
     nx, ny, nz = nxyz
     Lx, Ly, Lz = Lxyz
     Volume = Lx * Ly * Lz
     Δx = Lxyz ./ nxyz
     kF = 2*π ./ Lxyz
-
-    println("Calculate deltar{m,g}...")
-    @time deltarm = rfftplan \ deltakm
-    @time deltarg = rfftplan \ deltakg
-    @time @strided @. deltarm *= (nx*ny*nz) / Volume
-    @time @strided @. deltarg *= (nx*ny*nz) / Volume
-
-    println("Transform G → δ...")
-    @time σGm² = var_global(deltarm)
-    @time σGg² = var_global(deltarg)
-    #σGm²_th = calculate_sigmaGsq(pkGm, prod(Lxyz ./ nxyz))
-    #σGg²_th = calculate_sigmaGsq(pkGg, prod(Lxyz ./ nxyz))
-    @time @strided @. deltarm = exp(deltarm - σGm²/2) - 1
-    @time @strided @. deltarg = exp(deltarg - σGg²/2) - 1
 
     if faH != 0
         # Note: In this section we ignore the Volume/(nx*ny*nz) multiplication
@@ -324,7 +310,7 @@ function deltak_to_galaxies!(deltakm, deltakg, nxyz, Lxyz, Ngalaxies; faH=true, 
         # any case, we are really calculating the displacement field, so faH=1.
 
         println("Calculate deltakm...")
-        @time mul!(deltakm, rfftplan, deltarm)
+        @time deltakm = rfftplan * deltarm
         #@time @strided @. deltakm *= Volume / (nx*ny*nz)
         deltarm = nothing
 
@@ -367,6 +353,7 @@ end
 # simulate galaxies
 function simulate_galaxies(nxyz, Lxyz, Ngalaxies, pk, b, faH; rfftplan=default_plan(nxyz), rng=Random.GLOBAL_RNG, extra_phases=nothing)
     Volume = prod(Lxyz)
+    nx, ny, nz = nxyz
     kF = 2*π ./ Lxyz
 
     println("Convert pk to log-normal pkG...")
@@ -391,7 +378,25 @@ function simulate_galaxies(nxyz, Lxyz, Ngalaxies, pk, b, faH; rfftplan=default_p
         @time multiply_by_pk!(deltakm, pkGm, kF, Volume)
         @time multiply_by_pk!(deltakg, pkGg, kF, Volume)
 
-        xyzvi = deltak_to_galaxies!(deltakm, deltakg, nxyz, Lxyz, Ngalaxies; faH, rfftplan, rng)
+        println("Calculate deltar{m,g}...")
+        @time deltarm = rfftplan \ deltakm
+        @time deltarg = rfftplan \ deltakg
+        @time @strided @. deltarm *= (nx*ny*nz) / Volume
+        @time @strided @. deltarg *= (nx*ny*nz) / Volume
+        deltakm = nothing
+        deltakg = nothing
+
+        println("Transform G → δ...")
+        @time σGm² = var_global(deltarm)
+        @time σGg² = var_global(deltarg)
+        σGm²_th = calculate_sigmaGsq(pkGm, prod(Lxyz ./ nxyz))
+        σGg²_th = calculate_sigmaGsq(pkGg, prod(Lxyz ./ nxyz))
+        @show σGm², σGg²
+        @show σGm²_th, σGg²_th
+        @time @strided @. deltarm = exp(deltarm - σGm²/2) - 1
+        @time @strided @. deltarg = exp(deltarg - σGg²/2) - 1
+
+        xyzvi = deltak_to_galaxies!(deltarm, deltarg, nxyz, Lxyz, Ngalaxies, pkGm, pkGg; faH, rfftplan, rng)
         push!(xyzv, xyzvi)
     end
 
