@@ -408,7 +408,8 @@ end
 
 
 function simulate_galaxies(nbar, Lbox, pk; nmesh=256, bias=1.0, f=false,
-        rfftplanner=default_plan, rng=Random.GLOBAL_RNG, extra_phases=nothing)
+        rfftplanner=default_plan, rng=Random.GLOBAL_RNG, extra_phases=nothing,
+        gather=true)
 
     if nmesh isa Number
         nxyz = nmesh, nmesh, nmesh
@@ -439,6 +440,10 @@ function simulate_galaxies(nbar, Lbox, pk; nmesh=256, bias=1.0, f=false,
     for xv in xyzv
         @time x = @. xv[1:3,:] - Float32(Lbox / 2)
         @time v = xv[4:6,:]
+        if gather
+            x = concatenate_mpi_arr(x)
+            v = concatenate_mpi_arr(v)
+        end
         catalogs = (catalogs..., (x, v))
     end
 
