@@ -13,17 +13,7 @@ using DelimitedFiles
 using Statistics
 
 
-function Arsd_Kaiser(β, ℓ)
-    if ℓ == 0
-        return 1 + 2/3*β + 1/5*β^2
-    elseif ℓ == 2
-        return 4/3*β + 4/7*β^2
-    elseif ℓ == 4
-        return 8/35*β^2
-    else
-        return 0
-    end
-end
+include("lib.jl")
 
 
 function generate_sims(pk, nbar, b, f, L, n_sim, n_est, nrlz; rfftplanner=LogNormalGalaxies.plan_with_fftw)
@@ -56,12 +46,9 @@ function generate_sims(pk, nbar, b, f, L, n_sim, n_est, nrlz; rfftplanner=LogNor
         x⃗ = LogNormalGalaxies.concatenate_mpi_arr(x⃗)
         Ψ = LogNormalGalaxies.concatenate_mpi_arr(Ψ)
 
-        # add RSD
+        println("Add RSD...")
         los = [0, 0, 1]
-        Ngals = size(x⃗,2)
-        for i=1:Ngals
-            x⃗[:,i] .+= f * (Ψ[:,i]' * los) * los
-        end
+        @time apply_RSD!(x⃗, Ψ, f, los)
 
         x⃗ = MeasurePowerSpectra.periodic_boundaries(x⃗, LLL, box_center)
 
@@ -72,8 +59,8 @@ function generate_sims(pk, nbar, b, f, L, n_sim, n_est, nrlz; rfftplanner=LogNor
         @. sel &= -Lz/2 <= x⃗[3,:] <= Lz/2
         x⃗ = x⃗[:,sel]
 
-        # measure multipoles
-        kmi, pkmi, nmodesi = xgals_to_pkl_planeparallel(x⃗, LLL, nnn_est, box_center; opts...)
+        println("Measure multipoles...")
+        @time kmi, pkmi, nmodesi = xgals_to_pkl_planeparallel(x⃗, LLL, nnn_est, box_center; opts...)
         @assert km == kmi
         @assert nmodes == nmodesi
         @. pkm[:,:,rlz] = pkmi
