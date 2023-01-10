@@ -162,7 +162,7 @@ end
 ##################### draw galaxies ###########################
 function draw_galaxies_with_velocities(deltar, vx, vy, vz, Ngalaxies, Δx=[1.0,1.0,1.0];
         rng=Random.GLOBAL_RNG)
-    T = Float32
+    T = Float64
     rsd = !(vx == vy == vz == 0)
     nx, ny, nz = size_global(deltar)
     Navg = Ngalaxies / (nx * ny * nz)
@@ -203,23 +203,38 @@ end
 
 ######################### make galaxies file ######################
 
-# write galaxies in same format as lognormal_galaxies
+const file_format = 2
+
+
 function write_galaxies(fname, LLL, xyzv)
     Ngalaxies = size(xyzv,2)
+    ncols = size(xyzv,1)
     fout = open(fname, "w")
-    write(fout, convert(Vector{Float64}, LLL))
+    write(fout, Int64(file_format))
+    write(fout, Int64(ncols))
     write(fout, Int64(Ngalaxies))
-    write(fout, convert(Matrix{Float32}, xyzv))
+    write(fout, convert(Vector{Float64}, LLL))
+    write(fout, convert(Matrix{Float64}, xyzv))
     close(fout)
 end
 
 
-# read galaxies in same format as lognormal_galaxies
-function read_galaxies(fname; ncol=6)
+function read_galaxies(fname; ncols=6)
     fin = open(fname, "r")
-    Lx, Ly, Lz = read!(fin, Vector{Float64}(undef, 3))
-    Ngalaxies = read(fin, Int64)
-    xyzv = read!(fin, Matrix{Float32}(undef, ncol, Ngalaxies))
+    file_version = read(fin, Int64)
+    if file_verion == 2
+        ncols = read(fin, Int64)
+        Ngalaxies = read(fin, Int64)
+        Lx, Ly, Lz = read!(fin, Vector{Float64}(undef, 3))
+        xyzv = read!(fin, Matrix{Float64}(undef, ncols, Ngalaxies))
+    else
+        # read galaxies in same format as lognormal_galaxies
+        close(fin)
+        fin = open(fname, "r")
+        Lx, Ly, Lz = read!(fin, Vector{Float64}(undef, 3))
+        Ngalaxies = read(fin, Int64)
+        xyzv = read!(fin, Matrix{Float32}(undef, ncols, Ngalaxies))
+    end
     close(fin)
     return (Lx, Ly, Lz), xyzv
 end
@@ -420,7 +435,7 @@ function simulate_galaxies(nbar, Lbox, pk; nmesh=256, bias=1.0, f=false,
     @time xyzv = simulate_galaxies(nxyz, Lxyz, Ngalaxies, pk, bias, f;
                                    rfftplan, rng)
     println("Post-processing...")
-    @time xyz = @. xyzv[1:3,:] - Float32(Lbox / 2)
+    @time xyz = @. xyzv[1:3,:] - Lbox / 2
     @time v = xyzv[4:6,:]
     return xyz, v
 end
