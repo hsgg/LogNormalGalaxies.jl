@@ -15,8 +15,6 @@ export simulate_galaxies,
        write_galaxies
 
 
-include("Splines.jl")
-
 using Printf
 using FFTW
 using MPI
@@ -29,7 +27,7 @@ using Strided
 using LinearAlgebra
 
 
-using .Splines
+using Splines
 
 using QuadOsc
 using QuadGK

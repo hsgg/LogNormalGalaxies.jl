@@ -4,7 +4,7 @@ module lognormals
 
 
 using LogNormalGalaxies
-using LogNormalGalaxies.Splines
+using Splines
 using MeasurePowerSpectra
 using PyPlot
 using Random

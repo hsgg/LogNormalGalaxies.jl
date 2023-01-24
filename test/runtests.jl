@@ -4,7 +4,7 @@ using Revise
 
 using Test
 using LogNormalGalaxies
-using LogNormalGalaxies.Splines
+using Splines
 using DelimitedFiles
 using Random
 using BenchmarkTools
@@ -82,7 +82,7 @@ using BenchmarkTools
         pk(k) = 0.0
         #k, pkG = LogNormalGalaxies.pk_to_pkG(pk)
         k = 10.0 .^ (-3:0.01:0)
-        pkG = LogNormalGalaxies.Spline1D(k, pk.(k), extrapolation=LogNormalGalaxies.Splines.powerlaw)
+        pkG = LogNormalGalaxies.Spline1D(k, pk.(k), extrapolation=Splines.powerlaw)
         @test pkG(0) == 0
         @test pkG(0.0) == 0
         @test pkG(0.1) == 0
