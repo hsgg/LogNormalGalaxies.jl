@@ -97,18 +97,18 @@ function draw_phases(rfftplan; rng=Random.GLOBAL_RNG)
 end
 
 
-function calc_kvec(i, j, k, localrange, kF, ny2, nz2, ny, nz)
-    ig = localrange[1][i]  # global index of local index i
-    jg = localrange[2][j]  # global index of local index j
-    kg = localrange[3][k]  # global index of local index k
-    kx = kF[1] * (ig - 1)
-    ky = kF[2] * (jg <= ny2 ? jg-1 : jg-1-ny)
-    kz = kF[3] * (kg <= nz2 ? kg-1 : kg-1-nz)
-    return kx, ky, kz
+function calc_global_indices(ijk_local, localrange, ny2, nz2, ny, nz)
+    ig = localrange[1][ijk_local[1]]  # global index of local index i
+    jg = localrange[2][ijk_local[2]]  # global index of local index j
+    kg = localrange[3][ijk_local[3]]  # global index of local index k
+    ig = ig - 1
+    jg = jg <= ny2 ? jg-1 : jg-1-ny
+    kg = kg <= nz2 ? kg-1 : kg-1-nz
+    return ig, jg, kg
 end
 
 
-function iterate_kspace(func, deltak, kF; usethreads=false)
+function iterate_kspace(func, deltak; usethreads=false)
     nx2, ny, nz = size_global(deltak)
     ny2 = div(ny,2) + 1
     nz2 = div(nz,2) + 1
@@ -117,14 +117,16 @@ function iterate_kspace(func, deltak, kF; usethreads=false)
     if usethreads
         Threads.@threads for k=1:size(deltak,3)
             for j=1:size(deltak,2), i=1:size(deltak,1)
-                kvec = calc_kvec(i, j, k, localrange, kF, ny2, nz2, ny, nz)
-                func(i, j, k, kvec)
+                ijk_local = (i, j, k)
+                ijk_global = calc_global_indices(ijk_local, localrange, ny2, nz2, ny, nz)
+                func(ijk_local, ijk_global)
             end
         end
     else
         for k=1:size(deltak,3), j=1:size(deltak,2), i=1:size(deltak,1)
-            kvec = calc_kvec(i, j, k, localrange, kF, ny2, nz2, ny, nz)
-            func(i, j, k, kvec)
+            ijk_local = (i, j, k)
+            ijk_global = calc_global_indices(ijk_local, localrange, ny2, nz2, ny, nz)
+            func(ijk_local, ijk_global)
         end
     end
 
@@ -132,25 +134,26 @@ function iterate_kspace(func, deltak, kF; usethreads=false)
 end
 
 
-function multiply_by_pk!(deltak, pkfn, kF, Volume)
-    iterate_kspace(deltak, kF; usethreads=false) do i,j,k,kvec
-        kx, ky, kz = kvec
+function multiply_by_pk!(deltak, pkfn, kF::Tuple, Volume)
+    iterate_kspace(deltak; usethreads=false) do ijk_local,ijk_global
+        kx, ky, kz = kF .* ijk_global
         kmode = √(kx^2 + ky^2 + kz^2)
         pk = pkfn(kmode)  # not thread-safe
-        deltak[i,j,k] *= √(pk * Volume)
+        deltak[ijk_local...] *= √(pk * Volume)
     end
     return deltak
 end
 
 
-function calc_velocity_component!(deltak, kF, coord)
-    iterate_kspace(deltak, kF; usethreads=true) do i,j,k,kvec
+function calc_velocity_component!(deltak, kF::Tuple, coord)
+    iterate_kspace(deltak; usethreads=true) do ijk_local,ijk_global
+        kvec = kF .* ijk_global
         kx, ky, kz = kvec
         kmode2 = kx^2 + ky^2 + kz^2
         if kmode2 == 0
-            deltak[i,j,k] = 0
+            deltak[ijk_local...] = 0
         else
-            deltak[i,j,k] *= im * kvec[coord] / kmode2
+            deltak[ijk_local...] *= im * kvec[coord] / kmode2
         end
     end
     return deltak
