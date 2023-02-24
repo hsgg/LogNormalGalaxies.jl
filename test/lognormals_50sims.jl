@@ -53,27 +53,31 @@ function generate_sims(pk, nbar, b, f, L, n_sim, n_est, nrlz; rfftplanner=LogNor
         # generate catalog
         @time x⃗, Ψ = simulate_galaxies(nbar, L, pk; nmesh=n_sim, bias=b, f=true, rfftplanner)
         println("Gather galaxies...")
-        x⃗ = LogNormalGalaxies.concatenate_mpi_arr(x⃗)
-        Ψ = LogNormalGalaxies.concatenate_mpi_arr(Ψ)
+        @time x⃗ = LogNormalGalaxies.concatenate_mpi_arr(x⃗)
+        @time Ψ = LogNormalGalaxies.concatenate_mpi_arr(Ψ)
 
         # add RSD
+        println("Apply RSD...")
         los = [0, 0, 1]
         Ngals = size(x⃗,2)
         for i=1:Ngals
             x⃗[:,i] .+= f * (Ψ[:,i]' * los) * los
         end
 
-        x⃗ = MeasurePowerSpectra.periodic_boundaries(x⃗, LLL, box_center)
+        println("Apply periodic boundary...")
+        @time x⃗ = MeasurePowerSpectra.periodic_boundaries(x⃗, LLL, box_center)
 
-        # cut the possibly incomplete (due to RSD) boundaries
-        Lx, Ly, Lz = LLL
-        sel = @. -Lx/2 <= x⃗[1,:] <= Lx/2
-        @. sel &= -Ly/2 <= x⃗[2,:] <= Ly/2
-        @. sel &= -Lz/2 <= x⃗[3,:] <= Lz/2
-        x⃗ = x⃗[:,sel]
+        ## cut the possibly incomplete (due to RSD) boundaries
+        #println("Cut to box...")
+        #Lx, Ly, Lz = LLL
+        #@time sel = @. -Lx/2 <= x⃗[1,:] <= Lx/2
+        #@time @. sel &= -Ly/2 <= x⃗[2,:] <= Ly/2
+        #@time @. sel &= -Lz/2 <= x⃗[3,:] <= Lz/2
+        #@time x⃗ = x⃗[:,sel]
 
         # measure multipoles
-        kmi, pkmi, nmodesi = xgals_to_pkl_planeparallel(x⃗, LLL, nnn_est, box_center; opts...)
+        println("Measure power spectrum multipoles...")
+        @time kmi, pkmi, nmodesi = xgals_to_pkl_planeparallel(x⃗, LLL, nnn_est, box_center; opts...)
         @assert km == kmi
         @assert nmodes == nmodesi
         @. pkm[:,:,rlz] = pkmi
@@ -110,10 +114,10 @@ function main(fbase, rfftplanner=LogNormalGalaxies.plan_with_fftw)
     β = f / b
     pkm_kaiser = @. b^2 * Arsd_Kaiser(β, (0:4)') * pk(km)
 
+
     # plot
     #close("all")  # close previous plots to prevent plotcapolypse
     figure()
-    #title("Number of MPI Processes: $(MPI.Comm_size(MPI.COMM_WORLD))")
     hlines(1/nbar, extrema(km)..., color="0.75", label="Shot noise")
     plot(km, b^2 .* pk.(km), "k", label="input \$k\\,P(k)\$")
     for m=1:size(pkm,2)
@@ -126,6 +130,24 @@ function main(fbase, rfftplanner=LogNormalGalaxies.plan_with_fftw)
     ylabel(L"P_\ell(k)")
     xscale("log")
     xlim(right=0.6)
+    legend(fontsize="small")
+    savefig((@__DIR__)*"/$(fbase).pdf")
+
+
+    figure()
+    hlines(1, extrema(km)..., color="0.75")
+    for l=[0,2]
+        m = l+1
+        ymid = pkm[:,m] ./ pkm_kaiser[:,m]
+        yerr = pkm_err[:,m] ./ pkm_kaiser[:,m]
+        errorbar(km, ymid, yerr, c="C$(m-1)", alpha=0.7)
+        errorbar(km, ymid, yerr ./ sqrt(nrlz), c="C$(m-1)", elinewidth=4, alpha=0.7)
+        plot(km, ymid, "C$(m-1)-", label="\$P_{$(m-1)}(k)\$", alpha=0.7)
+    end
+    xlabel(L"k")
+    ylabel(L"P^{\rm meas}_\ell(k) / P_\ell(k)")
+    xscale("log")
+    #xlim(right=0.6)
     legend(fontsize="small")
     savefig((@__DIR__)*"/$(fbase).pdf")
 end
