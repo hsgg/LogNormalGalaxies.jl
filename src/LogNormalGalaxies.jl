@@ -288,21 +288,16 @@ function calculate_sigmaGsq(pk, Vcell)
 end
 
 
-function pixel_window!(deltak, nxyz)
-    #nx = size(deltak)  # nx[1] is actually nx/2
-    #nx2 = (nx[1], nx[2] ÷ 2 + 1, nx[3] ÷ 2 + 1)
-    nx2 = @. nxyz ÷ 2 + 1
-    p = 1  # NGP:1, CIC:2, TSC:3
-    localrange = range_local(deltak)
-    for k=1:size(deltak,3), j=1:size(deltak,2), i=1:size(deltak,1)
-        ig = localrange[1][i]  # global index of local index i
-        jg = localrange[2][j]  # global index of local index j
-        kg = localrange[3][k]  # global index of local index k
-        ikx = ig - 1
-        iky = jg - 1 - (jg <= nx2[2] ? 0 : nxyz[2])
-        ikz = kg - 1 - (kg <= nx2[3] ? 0 : nxyz[3])
-        Wmesh = (j0(π*ikx/nxyz[1]) * j0(π*iky/nxyz[2]) * j0(π*ikz/nxyz[3]))^p
-        deltak[i,j,k] /= Wmesh
+function pixel_window!(deltak, nxyz; voxel_window_power=1)
+    if voxel_window_power == 0
+        return deltak
+    end
+    iterate_kspace(deltak; usethreads=true) do ijk_local, ijk_global
+        Wmesh =  sinc(ijk_global[1] / nxyz[1])
+        Wmesh *= sinc(ijk_global[2] / nxyz[2])
+        Wmesh *= sinc(ijk_global[3] / nxyz[3])
+        Wemsh = Wmesh ^ voxel_window_power
+        deltak[ijk_local...] /= Wmesh  # acting on single δ
     end
 end
 
@@ -312,7 +307,7 @@ end
 # their interface.
 
 # simulate galaxies
-function simulate_galaxies(nxyz, Lxyz, Ngalaxies, pk, b, faH; rfftplan=default_plan(nxyz), rng=Random.GLOBAL_RNG, extra_test=false)
+function simulate_galaxies(nxyz, Lxyz, Ngalaxies, pk, b, faH; rfftplan=default_plan(nxyz), rng=Random.GLOBAL_RNG, extra_test=false, voxel_window_power=0)
     nx, ny, nz = nxyz
     Lx, Ly, Lz = Lxyz
     Volume = Lx * Ly * Lz
@@ -330,8 +325,8 @@ function simulate_galaxies(nxyz, Lxyz, Ngalaxies, pk, b, faH; rfftplan=default_p
     @time deltakg = deepcopy(deltakm)
     @time multiply_by_pk!(deltakg, pkGg, kF, Volume)
     @time multiply_by_pk!(deltakm, pkGm, kF, Volume)
-    ##@time pixel_window!(deltakm, nxyz)
-    #@time pixel_window!(deltakg, nxyz)
+    @time pixel_window!(deltakm, nxyz; voxel_window_power)
+    @time pixel_window!(deltakg, nxyz; voxel_window_power)
 
     println("Calculate deltar{m,g}...")
     @time deltarm = rfftplan \ deltakm
@@ -414,7 +409,7 @@ end
 
 
 function simulate_galaxies(nbar, Lbox, pk; nmesh=256, bias=1.0, f=false,
-        rfftplanner=default_plan, rng=Random.GLOBAL_RNG)
+        rfftplanner=default_plan, rng=Random.GLOBAL_RNG, voxel_window_power=0)
 
     if nmesh isa Number
         nxyz = nmesh, nmesh, nmesh
@@ -434,7 +429,7 @@ function simulate_galaxies(nbar, Lbox, pk; nmesh=256, bias=1.0, f=false,
     @time rfftplan = rfftplanner(nxyz)
 
     @time xyzv = simulate_galaxies(nxyz, Lxyz, Ngalaxies, pk, bias, f;
-                                   rfftplan, rng)
+                                   rfftplan, rng, voxel_window_power)
     println("Post-processing...")
     @time xyz = @. xyzv[1:3,:] - Lbox / 2
     @time v = xyzv[4:6,:]
