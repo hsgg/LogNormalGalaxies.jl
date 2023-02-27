@@ -214,7 +214,7 @@ function write_galaxies(fname, LLL, xyzv)
     write(fout, Int64(file_format))
     write(fout, Int64(ncols))
     write(fout, Int64(Ngalaxies))
-    write(fout, convert(Vector{Float64}, LLL))
+    write(fout, Vector{Float64}([LLL...]))  # explicitly convert Tuple to Vector
     write(fout, convert(Matrix{Float64}, xyzv))
     close(fout)
 end
@@ -223,7 +223,7 @@ end
 function read_galaxies(fname; ncols=6)
     fin = open(fname, "r")
     file_version = read(fin, Int64)
-    if file_verion == 2
+    if file_version == 2
         ncols = read(fin, Int64)
         Ngalaxies = read(fin, Int64)
         Lx, Ly, Lz = read!(fin, Vector{Float64}(undef, 3))
