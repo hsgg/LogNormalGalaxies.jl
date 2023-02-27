@@ -26,7 +26,7 @@ function Arsd_Kaiser(β, ℓ)
 end
 
 
-function generate_sims(pk, nbar, b, f, L, n_sim, n_est, nrlz; rfftplanner=LogNormalGalaxies.plan_with_fftw, sim_vox=0, est_vox=0)
+function generate_sims(pk, nbar, b, f, L, n_sim, n_est, nrlz; rfftplanner=LogNormalGalaxies.plan_with_fftw, sim_vox=0, est_vox=0, fxshift_est=0, fxshift_sim=0)
     LLL = [L, L, L]
     nnn_sim = [n_sim, n_sim, n_sim]
     nnn_est = [n_est, n_est, n_est]
@@ -53,31 +53,31 @@ function generate_sims(pk, nbar, b, f, L, n_sim, n_est, nrlz; rfftplanner=LogNor
         rsd = (f != 0)
 
         # generate catalog
-        @time x⃗, Ψ = simulate_galaxies(nbar, L, pk; sim_opts..., f=rsd)
-        println("Gather galaxies...")
-        @time x⃗ = LogNormalGalaxies.concatenate_mpi_arr(x⃗)
-        @time Ψ = LogNormalGalaxies.concatenate_mpi_arr(Ψ)
+        fname = "out/gals_rlz$rlz.bin"
+        if false
+            @time x⃗, Ψ = simulate_galaxies(nbar, L, pk; sim_opts..., f=rsd)
+            println("Gather galaxies...")
+            @time x⃗ = LogNormalGalaxies.concatenate_mpi_arr(x⃗)
+            @time Ψ = LogNormalGalaxies.concatenate_mpi_arr(Ψ)
+
+            mkpath(dirname(fname))
+            write_galaxies(fname, LLL, [x⃗; Ψ])
+        end
+        LLL, xyzv = read_galaxies(fname; ncols=6)
+        x⃗ = collect(xyzv[1:3,:])
+        Ψ = collect(xyzv[4:6,:])
 
         # add RSD
         if rsd
             println("Apply RSD...")
             los = [0, 0, 1]
-            Ngals = size(x⃗,2)
-            @time for i=1:Ngals
-                x⃗[:,i] .+= f * (Ψ[:,i]' * los) * los
-            end
+            @time x⃗ .+= f * (los' * Ψ) .* los
         end
+
+        @. x⃗ += fxshift_est * LLL / nnn_est + fxshift_sim * LLL / nnn_sim
 
         println("Apply periodic boundary...")
         @time x⃗ = MeasurePowerSpectra.periodic_boundaries(x⃗, LLL, box_center)
-
-        ## cut the possibly incomplete (due to RSD) boundaries
-        #println("Cut to box...")
-        #Lx, Ly, Lz = LLL
-        #@time sel = @. -Lx/2 <= x⃗[1,:] <= Lx/2
-        #@time @. sel &= -Ly/2 <= x⃗[2,:] <= Ly/2
-        #@time @. sel &= -Lz/2 <= x⃗[3,:] <= Lz/2
-        #@time x⃗ = x⃗[:,sel]
 
         # measure multipoles
         println("Measure power spectrum multipoles...")
@@ -149,34 +149,38 @@ function agrawal_fig2()
         f = 0 #0.71
         D = 1
         nbar = 1e-3
-        L = 1e3
-        n_sim = 256
-        n_est = 256
-        nrlz = 50
+        L = 3e3
+        n_sim = 512
+        n_est = 512
+        nrlz = 10
         sim_vox = 0
-        est_vox = 0
+        est_vox = 1
+        fxshift_sim = 0
+        fxshift_est = 0.5
     end
 end
 function agrawal_fig6_fig7()
     return quote
         b = 1.455
         f = 0.71
-        D = 0.2
+        D = 1
         nbar = 1e-3
-        L = 1e3
-        n_sim = 256
+        L = 3e3
+        n_sim = 512
         n_est = 256
-        nrlz = 50
+        nrlz = 10
         sim_vox = 0
-        est_vox = 0
+        est_vox = 1
+        fxshift_est = 0.25
+        fxshift_sim = 0
     end
 end
 
 
 function main(fbase, rfftplanner=LogNormalGalaxies.plan_with_fftw)
 
-    #@eval $(agrawal_fig2())
-    @eval $(agrawal_fig6_fig7())
+    @eval $(agrawal_fig2())
+    #@eval $(agrawal_fig6_fig7())
 
     #data = readdlm((@__DIR__)*"/matterpower.dat", comments=true)
     #_pk = Spline1D(data[:,1], data[:,2], extrapolation=Splines.powerlaw)
@@ -186,11 +190,12 @@ function main(fbase, rfftplanner=LogNormalGalaxies.plan_with_fftw)
 
     pk(k) = D^2 * _pk(k)
 
+    fname = make_fname("out/"*fbase; nbar, b, D, f, L, n_sim, n_est, sim_vox, est_vox, nrlz, fxshift_est, fxshift_sim)
+    #fname = make_fname("out_linbias/"*fbase; nbar, b, D, f, L, n_sim, n_est, sim_vox, est_vox, nrlz, fxshift_est, fxshift_sim)
+    #fname = make_fname("out_linbias2/"*fbase; nbar, b, D, f, L, n_sim, n_est, sim_vox, est_vox, nrlz, fxshift_est, fxshift_sim)
+
     println("Running with $(rfftplanner)...")
-    fname = make_fname("out/"*fbase; nbar, b, D, f, L, n_sim, n_est, sim_vox, est_vox, nrlz)
-    #fname = make_fname("out_linbias/"*fbase; nbar, b, D, f, L, n_sim, n_est, sim_vox, est_vox, nrlz)
-    #fname = make_fname("out_linbias2/"*fbase; nbar, b, D, f, L, n_sim, n_est, sim_vox, est_vox, nrlz)
-    km, pkm, nmodes, pkm_err = generate_sims(pk, nbar, b, f, L, n_sim, n_est, nrlz; rfftplanner, sim_vox, est_vox)
+    km, pkm, nmodes, pkm_err = generate_sims(pk, nbar, b, f, L, n_sim, n_est, nrlz; rfftplanner, sim_vox, est_vox, fxshift_est, fxshift_sim)
     writedlm(fname, [km pkm nmodes pkm_err])
     km, pkm, nmodes, pkm_err = readdlm_cols(fname, [1, 2:6, 7, 8:12])
 
@@ -220,7 +225,7 @@ function main(fbase, rfftplanner=LogNormalGalaxies.plan_with_fftw)
 
 
     figure()
-    make_title(; L, D, f, n_sim, n_est, sim_vox, est_vox)
+    make_title(; L, D, f, n_sim, n_est, sim_vox, est_vox, xshift=fxshift_est)
     hlines(1, extrema(km)..., color="0.8")
     hlines([0.99,1.01], extrema(km)..., color="0.7", linestyle="--")
     hlines([0.95,1.05], extrema(km)..., color="0.6", linestyle=":")
@@ -236,7 +241,7 @@ function main(fbase, rfftplanner=LogNormalGalaxies.plan_with_fftw)
     xlabel(L"k")
     ylabel(L"\hat P^{\rm pp}_\ell(k) / P^{\rm Kaiser}_\ell(k)")
     #xscale("log")
-    xlim(right=0.5)
+    xlim(right=0.15)
     ylim(0.9, 1.1)
     legend(fontsize="small")
     savefig((@__DIR__)*"/$(fbase)_rdiff.pdf")
