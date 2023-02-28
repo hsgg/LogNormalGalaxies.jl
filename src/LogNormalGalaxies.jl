@@ -167,7 +167,7 @@ function draw_galaxies_with_velocities(deltar, vx, vy, vz, Ngalaxies, Δx=[1.0,1
     rsd = !(vx == vy == vz == 0)
     nx, ny, nz = size_global(deltar)
     Navg = Ngalaxies / (nx * ny * nz)
-    xyzv = fill(T(0), 6*Ngalaxies)
+    xyzv = fill(T(0), 0)
     localrange = range_local(deltar)
     Ngalaxies_local_actual = 0
     for k=1:size(deltar,3), j=1:size(deltar,2), i=1:size(deltar,1)
@@ -178,7 +178,7 @@ function draw_galaxies_with_velocities(deltar, vx, vy, vz, Ngalaxies, Δx=[1.0,1
         g0 = 6 * Ngalaxies_local_actual  # g0 is the index in the xyzv 1D-array
         if g0 + 6*Nthiscell > length(xyzv)
             resize!(xyzv, length(xyzv) + 6*Nthiscell)
-            xyzv[g0:end] .= 0  # in case rsd=false
+            xyzv[(g0+1):end] .= 0  # in case rsd=false
         end
         for _=1:Nthiscell
             x = ig - 1 + rand(rng)
@@ -196,7 +196,6 @@ function draw_galaxies_with_velocities(deltar, vx, vy, vz, Ngalaxies, Δx=[1.0,1
         end
         Ngalaxies_local_actual += Nthiscell
     end
-    resize!(xyzv, 6 * Ngalaxies_local_actual)
     xyzv_out = reshape(xyzv, 6, :)
     return xyzv_out
 end
