@@ -39,6 +39,9 @@ j0(x) = sinc(x/π)  # this function is used in multiple locations
 # intra-module include files
 include("pk_to_pkG.jl")
 include("arrays.jl")
+include("LinearInterpolations.jl")
+
+using .LinearInterpolations
 
 
 ######################## misc functions
@@ -162,43 +165,70 @@ end
 
 ##################### draw galaxies ###########################
 function draw_galaxies_with_velocities(deltar, vx, vy, vz, Ngalaxies, Δx=[1.0,1.0,1.0];
-        rng=Random.GLOBAL_RNG)
+        rng=Random.GLOBAL_RNG, voxel_window_power=1)
     T = Float64
     rsd = !(vx == vy == vz == 0)
     nx, ny, nz = size_global(deltar)
     Navg = Ngalaxies / (nx * ny * nz)
-    xyzv = fill(T(0), 0)
+    @show Navg
+    xyzv = fill(T(0), 6 * Ngalaxies)
     localrange = range_local(deltar)
     Ngalaxies_local_actual = 0
+    interp_vx = InterpolationOctants(3)
+    interp_vy = InterpolationOctants(3)
+    interp_vz = InterpolationOctants(3)
     for k=1:size(deltar,3), j=1:size(deltar,2), i=1:size(deltar,1)
         ig = localrange[1][i]  # global index of local index i
         jg = localrange[2][j]  # global index of local index j
         kg = localrange[3][k]  # global index of local index k
+
         Nthiscell = pois_rand(rng, (1 + deltar[i,j,k]) * Navg)
+
         g0 = 6 * Ngalaxies_local_actual  # g0 is the index in the xyzv 1D-array
-        if g0 + 6*Nthiscell > length(xyzv)
+        if g0 + 6 * Nthiscell > length(xyzv)
             resize!(xyzv, length(xyzv) + 6*Nthiscell)
             xyzv[(g0+1):end] .= 0  # in case rsd=false
         end
+
         for _=1:Nthiscell
-            x = ig - 1 + rand(rng)
-            y = jg - 1 + rand(rng)
-            z = kg - 1 + rand(rng)
+            x = ig - 0.5  # center of grid cell
+            y = jg - 0.5
+            z = kg - 0.5
+            for _ = 1:voxel_window_power
+                x += rand(rng) - 0.5
+                y += rand(rng) - 0.5
+                z += rand(rng) - 0.5
+            end
+
             xyzv[g0+1] = x*Δx[1]
             xyzv[g0+2] = y*Δx[2]
             xyzv[g0+3] = z*Δx[3]
+
             if rsd
-                xyzv[g0+4] = vx[i,j,k]
-                xyzv[g0+5] = vy[i,j,k]
-                xyzv[g0+6] = vz[i,j,k]
+                #xyzv[g0+4] = vx[i,j,k]
+                #xyzv[g0+5] = vy[i,j,k]
+                #xyzv[g0+6] = vz[i,j,k]
+                InterpolationOctants!(interp_vx, ig, jg, kg, vx)
+                InterpolationOctants!(interp_vy, ig, jg, kg, vy)
+                InterpolationOctants!(interp_vz, ig, jg, kg, vz)
+                gal_xyz_rindex = (x + 0.5, y + 0.5, z + 0.5)
+                xyzv[g0+4] = interp_vx(gal_xyz_rindex)
+                xyzv[g0+5] = interp_vy(gal_xyz_rindex)
+                xyzv[g0+6] = interp_vz(gal_xyz_rindex)
             end # else xyzv[4:6] = 0
+
             g0 += 6
         end
+
         Ngalaxies_local_actual += Nthiscell
     end
+    resize!(xyzv, 6 * Ngalaxies_local_actual)
+
     xyzv_out = reshape(xyzv, 6, :)
+
     return xyzv_out
 end
+
 
 
 ######################### make galaxies file ######################
@@ -324,8 +354,8 @@ function simulate_galaxies(nxyz, Lxyz, Ngalaxies, pk, b, faH; rfftplan=default_p
     @time deltakg = deepcopy(deltakm)
     @time multiply_by_pk!(deltakg, pkGg, kF, Volume)
     @time multiply_by_pk!(deltakm, pkGm, kF, Volume)
-    @time pixel_window!(deltakm, nxyz; voxel_window_power)
-    @time pixel_window!(deltakg, nxyz; voxel_window_power)
+    #@time pixel_window!(deltakm, nxyz; voxel_window_power)
+    #@time pixel_window!(deltakg, nxyz; voxel_window_power)
 
     println("Calculate deltar{m,g}...")
     @time deltarm = rfftplan \ deltakm
@@ -396,7 +426,7 @@ function simulate_galaxies(nxyz, Lxyz, Ngalaxies, pk, b, faH; rfftplan=default_p
     end
 
     println("Draw galaxies...")
-    @time xyzv = draw_galaxies_with_velocities(deltarg, vx, vy, vz, Ngalaxies, Δx; rng)
+    @time xyzv = draw_galaxies_with_velocities(deltarg, vx, vy, vz, Ngalaxies, Δx; rng, voxel_window_power)
 
     if faH != 1 && faH != 0
         @time @strided @. xyzv[4:6,:] *= faH
