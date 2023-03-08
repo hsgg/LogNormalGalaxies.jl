@@ -165,18 +165,22 @@ end
 
 ##################### draw galaxies ###########################
 function draw_galaxies_with_velocities(deltar, vx, vy, vz, Ngalaxies, Δx=[1.0,1.0,1.0];
-        rng=Random.GLOBAL_RNG, voxel_window_power=1)
+        rng=Random.GLOBAL_RNG, voxel_window_power=1, velocity_assignment=1)
     T = Float64
     rsd = !(vx == vy == vz == 0)
-    nx, ny, nz = size_global(deltar)
-    Navg = Ngalaxies / (nx * ny * nz)
+    Navg = Ngalaxies / prod(size_global(deltar))
     @show Navg
     xyzv = fill(T(0), 6 * Ngalaxies)
     localrange = range_local(deltar)
     Ngalaxies_local_actual = 0
-    interp_vx = InterpolationOctants(3)
-    interp_vy = InterpolationOctants(3)
-    interp_vz = InterpolationOctants(3)
+
+    pnvx = PeriodicNeighborView3D([0,0,0], vx)
+    pnvy = PeriodicNeighborView3D([0,0,0], vy)
+    pnvz = PeriodicNeighborView3D([0,0,0], vz)
+    interp_vx = LinearInterpolation(3)
+    interp_vy = LinearInterpolation(3)
+    interp_vz = LinearInterpolation(3)
+
     for k=1:size(deltar,3), j=1:size(deltar,2), i=1:size(deltar,1)
         ig = localrange[1][i]  # global index of local index i
         jg = localrange[2][j]  # global index of local index j
@@ -191,7 +195,8 @@ function draw_galaxies_with_velocities(deltar, vx, vy, vz, Ngalaxies, Δx=[1.0,1
         end
 
         for _=1:Nthiscell
-            x = ig - 0.5  # center of grid cell
+            # center of cell ig=1 is at x=0.5*Δx
+            x = ig - 0.5
             y = jg - 0.5
             z = kg - 0.5
             for _ = 1:voxel_window_power
@@ -205,16 +210,27 @@ function draw_galaxies_with_velocities(deltar, vx, vy, vz, Ngalaxies, Δx=[1.0,1
             xyzv[g0+3] = z*Δx[3]
 
             if rsd
-                #xyzv[g0+4] = vx[i,j,k]
-                #xyzv[g0+5] = vy[i,j,k]
-                #xyzv[g0+6] = vz[i,j,k]
-                InterpolationOctants!(interp_vx, ig, jg, kg, vx)
-                InterpolationOctants!(interp_vy, ig, jg, kg, vy)
-                InterpolationOctants!(interp_vz, ig, jg, kg, vz)
-                gal_xyz_rindex = (x + 0.5, y + 0.5, z + 0.5)
-                xyzv[g0+4] = interp_vx(gal_xyz_rindex)
-                xyzv[g0+5] = interp_vy(gal_xyz_rindex)
-                xyzv[g0+6] = interp_vz(gal_xyz_rindex)
+                if velocity_assignment == 1
+                    xyzv[g0+4] = vx[i,j,k]
+                    xyzv[g0+5] = vy[i,j,k]
+                    xyzv[g0+6] = vz[i,j,k]
+                elseif velocity_assignment == 2
+                    # Find "bottom-left" grid point of octant, relative to
+                    # (ig,jg,kg), the center of which is at (ig-0.5, jg-0.5,
+                    # kg-0.5).
+                    Δijk0 = @. - Int((x, y, z) - (ig-0.5, jg-0.5, kg-0.5) < 0)
+                    ijk0 = @. (ig, jg, kg) + Δijk0
+                    x0 = @. ijk - 0.5
+                    pnvx.ijk .= ijk0
+                    pnvy.ijk .= ijk0
+                    pnvz.ijk .= ijk0
+                    LinearInterpolation!(interp_vx, x0, pnvx)
+                    LinearInterpolation!(interp_vy, x0, pnvy)
+                    LinearInterpolation!(interp_vz, x0, pnvz)
+                    xyzv[g0+4] = interp_vx((x,y,z))
+                    xyzv[g0+5] = interp_vy((x,y,z))
+                    xyzv[g0+6] = interp_vz((x,y,z))
+                end
             end # else xyzv[4:6] = 0
 
             g0 += 6
@@ -336,7 +352,7 @@ end
 # their interface.
 
 # simulate galaxies
-function simulate_galaxies(nxyz, Lxyz, Ngalaxies, pk, b, faH; rfftplan=default_plan(nxyz), rng=Random.GLOBAL_RNG, extra_test=false, voxel_window_power=0)
+function simulate_galaxies(nxyz, Lxyz, Ngalaxies, pk, b, faH; rfftplan=default_plan(nxyz), rng=Random.GLOBAL_RNG, extra_test=false, voxel_window_power=0, velocity_assignment=1)
     nx, ny, nz = nxyz
     Lx, Ly, Lz = Lxyz
     Volume = Lx * Ly * Lz
@@ -426,7 +442,7 @@ function simulate_galaxies(nxyz, Lxyz, Ngalaxies, pk, b, faH; rfftplan=default_p
     end
 
     println("Draw galaxies...")
-    @time xyzv = draw_galaxies_with_velocities(deltarg, vx, vy, vz, Ngalaxies, Δx; rng, voxel_window_power)
+    @time xyzv = draw_galaxies_with_velocities(deltarg, vx, vy, vz, Ngalaxies, Δx; rng, voxel_window_power, velocity_assignment)
 
     if faH != 1 && faH != 0
         @time @strided @. xyzv[4:6,:] *= faH
@@ -438,7 +454,8 @@ end
 
 
 function simulate_galaxies(nbar, Lbox, pk; nmesh=256, bias=1.0, f=false,
-        rfftplanner=default_plan, rng=Random.GLOBAL_RNG, voxel_window_power=0)
+        rfftplanner=default_plan, rng=Random.GLOBAL_RNG, voxel_window_power=0,
+        velocity_assignment=1)
 
     if nmesh isa Number
         nxyz = nmesh, nmesh, nmesh
@@ -458,7 +475,8 @@ function simulate_galaxies(nbar, Lbox, pk; nmesh=256, bias=1.0, f=false,
     @time rfftplan = rfftplanner(nxyz)
 
     @time xyzv = simulate_galaxies(nxyz, Lxyz, Ngalaxies, pk, bias, f;
-                                   rfftplan, rng, voxel_window_power)
+                                   rfftplan, rng, voxel_window_power,
+                                   velocity_assignment)
     println("Post-processing...")
     @time xyz = @. xyzv[1:3,:] - Lbox / 2
     @time v = xyzv[4:6,:]
