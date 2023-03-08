@@ -222,7 +222,7 @@ function draw_galaxies_with_velocities(deltar, vx, vy, vz, Ngalaxies, Δx=[1.0,1
                     # kg-0.5).
                     Δijk0 = @. - Int((x, y, z) - (ig-0.5, jg-0.5, kg-0.5) < 0)
                     ijk0 = @. (ig, jg, kg) + Δijk0
-                    x0 = @. ijk - 0.5
+                    x0 = @. ijk0 - 0.5
                     pnvx.ijk .= ijk0
                     pnvy.ijk .= ijk0
                     pnvz.ijk .= ijk0
