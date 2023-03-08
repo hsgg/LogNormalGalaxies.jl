@@ -211,6 +211,8 @@ function draw_galaxies_with_velocities(deltar, vx, vy, vz, Ngalaxies, Δx=[1.0,1
 
             if rsd
                 if velocity_assignment == 1
+                    # TODO: if voxel_window_power>=2, then maybe we want to use
+                    # the nearest grid point?
                     xyzv[g0+4] = vx[i,j,k]
                     xyzv[g0+5] = vy[i,j,k]
                     xyzv[g0+6] = vz[i,j,k]
@@ -352,7 +354,7 @@ end
 # their interface.
 
 # simulate galaxies
-function simulate_galaxies(nxyz, Lxyz, Ngalaxies, pk, b, faH; rfftplan=default_plan(nxyz), rng=Random.GLOBAL_RNG, extra_test=false, voxel_window_power=0, velocity_assignment=1)
+function simulate_galaxies(nxyz, Lxyz, Ngalaxies, pk, b, faH; rfftplan=default_plan(nxyz), rng=Random.GLOBAL_RNG, extra_test=false, voxel_window_power=1, velocity_assignment=1)
     nx, ny, nz = nxyz
     Lx, Ly, Lz = Lxyz
     Volume = Lx * Ly * Lz
@@ -454,7 +456,7 @@ end
 
 
 function simulate_galaxies(nbar, Lbox, pk; nmesh=256, bias=1.0, f=false,
-        rfftplanner=default_plan, rng=Random.GLOBAL_RNG, voxel_window_power=0,
+        rfftplanner=default_plan, rng=Random.GLOBAL_RNG, voxel_window_power=1,
         velocity_assignment=1)
 
     if nmesh isa Number

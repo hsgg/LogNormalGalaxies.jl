@@ -177,7 +177,7 @@ using BenchmarkTools
             Ψold = fill(Float64(0), size(x⃗old))
         end
 
-        @time x⃗, Ψ = simulate_galaxies(nbar, L, pk; nmesh, bias, f=rsd, rng)
+        @time x⃗, Ψ = simulate_galaxies(nbar, L, pk; nmesh, bias, f=rsd, rng, voxel_window_power=1, velocity_assignment=1)
         x⃗ = LogNormalGalaxies.concatenate_mpi_arr(x⃗)
         Ψ = LogNormalGalaxies.concatenate_mpi_arr(Ψ)
 
@@ -194,7 +194,8 @@ using BenchmarkTools
     end
 
 
-    include("lognormals_50sims.jl")
+    ## This meant to be used more interactively:
+    #include("lognormals_50sims.jl")
 end
 
 
