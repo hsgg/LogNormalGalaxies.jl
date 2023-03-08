@@ -54,7 +54,7 @@ function generate_sims(pk, nbar, b, f, L, n_sim, n_est, nrlz; rfftplanner=LogNor
 
         # generate catalog
         fname = "out/gals_rlz$rlz.bin"
-        if generate
+        if generate && !isfile(fname)
             @time x⃗, Ψ = simulate_galaxies(nbar, L, pk; sim_opts..., f=rsd)
             println("Gather galaxies...")
             @time x⃗ = LogNormalGalaxies.concatenate_mpi_arr(x⃗)
@@ -146,17 +146,19 @@ end
 function agrawal_fig2()
     return quote
         b = 1.455
-        f = 0 #0.71
+        f = 0.71
+        #f = 0
         D = 1
         nbar = 1e-3
-        L = 0.25e3
-        n_sim = 256
-        n_est = 256
+        L = 3e3
+        n_sim = 512
+        n_est = 512
         nrlz = 100
-        sim_vox = 1
-        est_vox = 3
+        sim_vox = 2
+        est_vox = 0
+        sim_velo = 2
         fxshift_sim = 0
-        fxshift_est = 0.25
+        fxshift_est = 0
     end
 end
 function agrawal_fig6_fig7()
@@ -165,23 +167,23 @@ function agrawal_fig6_fig7()
         f = 0.71
         D = 1
         nbar = 1e-3
-        L = 1e3
-        n_sim = 256
-        n_est = 256
-        nrlz = 10
+        L = 3e3
+        n_sim = 512
+        n_est = 512
+        nrlz = 100
         sim_vox = 2
-        est_vox = 3
-        fxshift_est = 0
+        est_vox = 0
         fxshift_sim = 0
+        fxshift_est = 0
     end
 end
 
 
 function main(fbase, rfftplanner=LogNormalGalaxies.plan_with_fftw)
 
-    #@eval $(agrawal_fig2())
-    @eval $(agrawal_fig6_fig7())
-    generate = false
+    @eval $(agrawal_fig2())
+    #@eval $(agrawal_fig6_fig7())
+    generate = true
 
     #data = readdlm((@__DIR__)*"/matterpower.dat", comments=true)
     #_pk = Spline1D(data[:,1], data[:,2], extrapolation=Splines.powerlaw)
