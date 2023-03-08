@@ -210,12 +210,17 @@ function draw_galaxies_with_velocities(deltar, vx, vy, vz, Ngalaxies, Δx=[1.0,1
             xyzv[g0+3] = z*Δx[3]
 
             if rsd
-                if velocity_assignment == 1
-                    # TODO: if voxel_window_power>=2, then maybe we want to use
-                    # the nearest grid point?
+                if velocity_assignment == 0
                     xyzv[g0+4] = vx[i,j,k]
                     xyzv[g0+5] = vy[i,j,k]
                     xyzv[g0+6] = vz[i,j,k]
+                elseif velocity_assignment == 1
+                    # If voxel_window_power>=2, then maybe we want to use the
+                    # nearest grid point for the velocity:
+                    ijk = @. round(Int, (x,y,z) + 0.5) + 0
+                    xyzv[g0+4] = vx[mod1(ijk[1],end), mod1(ijk[2],end), mod1(ijk[3],end)]
+                    xyzv[g0+5] = vy[mod1(ijk[1],end), mod1(ijk[2],end), mod1(ijk[3],end)]
+                    xyzv[g0+6] = vz[mod1(ijk[1],end), mod1(ijk[2],end), mod1(ijk[3],end)]
                 elseif velocity_assignment == 2
                     # Find "bottom-left" grid point of octant, relative to
                     # (ig,jg,kg), the center of which is at (ig-0.5, jg-0.5,
@@ -232,6 +237,18 @@ function draw_galaxies_with_velocities(deltar, vx, vy, vz, Ngalaxies, Δx=[1.0,1
                     xyzv[g0+4] = interp_vx((x,y,z))
                     xyzv[g0+5] = interp_vy((x,y,z))
                     xyzv[g0+6] = interp_vz((x,y,z))
+                elseif velocity_assignment == 3
+                    # Average of nearest cells
+                    Δijk0 = @. - Int((x, y, z) - (ig-0.5, jg-0.5, kg-0.5) < 0)
+                    ijk0 = @. (ig, jg, kg) + Δijk0
+                    pnvx.ijk .= ijk0
+                    pnvy.ijk .= ijk0
+                    pnvz.ijk .= ijk0
+                    for di=1:2, dj=1:2, dk=1:2
+                        xyzv[g0+4] += pnvx[di,dj,dk] / 8
+                        xyzv[g0+5] += pnvy[di,dj,dk] / 8
+                        xyzv[g0+6] += pnvz[di,dj,dk] / 8
+                    end
                 end
             end # else xyzv[4:6] = 0
 
