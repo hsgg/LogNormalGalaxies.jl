@@ -172,7 +172,7 @@ end
 
 ##################### draw galaxies ###########################
 function draw_galaxies_with_velocities(deltar, vx, vy, vz, Ngalaxies, Δx=[1.0,1.0,1.0];
-        rng=Random.GLOBAL_RNG, voxel_window_power=1, velocity_assignment=1)
+        rng=Random.GLOBAL_RNG, voxel_window_power=1, velocity_assignment=1, sigma_psi=0.0)
     T = Float64
     rsd = !(vx == vy == vz == 0)
     Navg = Ngalaxies / prod(size_global(deltar))
@@ -257,7 +257,15 @@ function draw_galaxies_with_velocities(deltar, vx, vy, vz, Ngalaxies, Δx=[1.0,1
                         xyzv[g0+6] += pnvz[di,dj,dk] / 8
                     end
                 end
+
             end # else xyzv[4:6] = 0
+
+            # FoG: sigma_u = f * sigma_psi
+            if sigma_psi != 0
+                xyzv[g0+4] += sigma_psi * randn()
+                xyzv[g0+5] += sigma_psi * randn()
+                xyzv[g0+6] += sigma_psi * randn()
+            end
 
             g0 += 6
         end
@@ -378,7 +386,7 @@ end
 # their interface.
 
 # simulate galaxies
-function simulate_galaxies(nxyz, Lxyz, Ngalaxies, pk, b, faH; rfftplan=default_plan(nxyz), rng=Random.GLOBAL_RNG, extra_test=false, voxel_window_power=1, velocity_assignment=1)
+function simulate_galaxies(nxyz, Lxyz, Ngalaxies, pk, b, faH; rfftplan=default_plan(nxyz), rng=Random.GLOBAL_RNG, extra_test=false, voxel_window_power=1, velocity_assignment=1, sigma_psi=0.0)
     nx, ny, nz = nxyz
     Lx, Ly, Lz = Lxyz
     Volume = Lx * Ly * Lz
@@ -468,7 +476,7 @@ function simulate_galaxies(nxyz, Lxyz, Ngalaxies, pk, b, faH; rfftplan=default_p
     end
 
     println("Draw galaxies...")
-    @time xyzv = draw_galaxies_with_velocities(deltarg, vx, vy, vz, Ngalaxies, Δx; rng, voxel_window_power, velocity_assignment)
+    @time xyzv = draw_galaxies_with_velocities(deltarg, vx, vy, vz, Ngalaxies, Δx; rng, voxel_window_power, velocity_assignment, sigma_psi)
 
     if faH != 1 && faH != 0
         @time @strided @. xyzv[4:6,:] *= faH
@@ -481,7 +489,7 @@ end
 
 function simulate_galaxies(nbar, Lbox, pk; nmesh=256, bias=1.0, f=false,
         rfftplanner=default_plan, rng=Random.GLOBAL_RNG, voxel_window_power=1,
-        velocity_assignment=1)
+        velocity_assignment=1, sigma_psi=0.0)
 
     if nmesh isa Number
         nxyz = nmesh, nmesh, nmesh
@@ -502,7 +510,7 @@ function simulate_galaxies(nbar, Lbox, pk; nmesh=256, bias=1.0, f=false,
 
     @time xyzv = simulate_galaxies(nxyz, Lxyz, Ngalaxies, pk, bias, f;
                                    rfftplan, rng, voxel_window_power,
-                                   velocity_assignment)
+                                   velocity_assignment, sigma_psi)
     println("Post-processing...")
     @time xyz = @. xyzv[1:3,:] - Lbox / 2
     @time v = xyzv[4:6,:]
