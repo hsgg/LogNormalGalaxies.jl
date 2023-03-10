@@ -399,6 +399,9 @@ function simulate_galaxies(nxyz, Lxyz, Ngalaxies, pk, b, faH; rfftplan=default_p
 
     println("Draw random phases...")
     @time deltakm = draw_phases(rfftplan; rng)
+    #if fixed
+    #    @strided @. deltakm /= abs(deltakm)
+    #end
 
     println("Calculate deltak{m,g}...")
     @time deltakg = deepcopy(deltakm)
