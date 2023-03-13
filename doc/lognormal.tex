@@ -368,16 +368,9 @@ we include the pixel window,
 \\
 &= \int\frac{\dd^3k}{(2\pi)^3}\,|\widetilde W(\vk)|^2\,P_G(k)\,.
 \ea
-
-Several things to consider here. First, it appears that in
-\citet{Agrawal+:2017JCAP...10..003A} they only consider power spectra with
-small amplitude. In such cases, the log-normal nature is nearly irrelevant,
-because $\ln(1+\delta)\simeq\delta$. Also, $\xi_G(0)$ is well-defined. Is
-$P_G(0)$ well-defined?
-
-Numerically, I find that the variation of $\sigma_G^2$ from one simulation is
-within machine precision. This seems off to me. Perhaps we can estimate what
-the expectation here is?
+Numerically, I find that $\sigma_G^2$ from one simulation is about 24\% higher
+for the matter field, and 20\% for the galaxy field. This may due to the
+calculation assuming spherical cells, while our cells are cubic.
 
 
 
