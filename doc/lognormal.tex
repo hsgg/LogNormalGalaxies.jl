@@ -231,22 +231,6 @@
 \tableofcontents
 
 
-TODO:
-\begin{itemize}
-  \item Plot $P_G(k)$
-  \item Integrate using QuadOsc
-  \item Predict $\frac12\sigma_G^2$.
-  \item Deviations seem to depend mostly on the strength of the RSD, i.e., how
-    large $fD$ is. Nevermind, real-space simulation with large $D$ already
-    shows the problem.
-  \item Properly handle pixel window, in both LogNormalGalaxies.jl and
-    MeasurePowerSpectra.jl. No pixel-window handling in either of those
-    packages should cancel each other. However, I don't observe that, so there
-    is some debugging to do.
-\end{itemize}
-
-
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Introduction}
 The density contrast field $\delta(\vx)$ is often treated as Gaussian. However,
@@ -407,107 +391,12 @@ probability of the neighboring cells, this is the same as drawing from a
 tri-linear interpolation distribution (since Poisson probabilities add), and it
 is similar to CiC on the estimator side.
 
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\subsection{Theory Prediction}
-Here we aim to incorporate the FoG effect in the multipoles for the plane
-parallel limit. Also, see \citet{Lee:2018JCAP...02..039L}.
-Our model for the power spectrum is
-\ba
-P(k,\mu) &= b^2 (1+\beta\mu^2)^2 \, e^{-\sigma_u^2k^2\mu^2}\,P(k)\,,
-\ea
-where $\beta=f/b$, and to first order we expect
-\ba
-\sigma_u^2 &= \frac{f}{3}\int\frac{\dd^3k}{(2\pi)^3}\,\frac{P_m(k)}{k^2}\,.
-\ea
-The multipole power spectrum is, then,
-\ba
-P_\ell(k) &= \int_{-1}^1\frac{\dd\mu}{2}\,\mathcal{L}_\ell(\mu)\,P(k,\mu) \\
-          &= b^2\big[I^\ell_0(x)+2\beta I^\ell_2(x)+\beta^2I^\ell_4(x)\big] P(k)\,,
-\ea
-where we defined $x = \sigma_u k$ and
-\ba
-I^\ell_n(x) &= \int_{-1}^1 \frac{\dd\mu}{2} \, \mathcal{L}_\ell(\mu) \, \mu^n \, e^{-x^2\mu^2}\,.
-\ea
+Velocities can be assigned by several options: Using the nearest grid point, or
+by linearly interpolating neighbors.
+To simulate a FoG, we add Gaussian noise to the velocities.
 
 
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\section{Options}
-%%%%%%%%%%%%%
-It appears there are two types of log-normals: those that include FoG and those
-that don't. \citet{Agrawal+:2017JCAP...10..003A} seems to not include FoG,
-except for some from nonlinear Jacobian and simply by virtue of approximations
-that add stochasticity. NBodyKit seems to include FoG in the Zel'dovich
-approximation.
-
-\subsection{NBodyKit}
-NBodyKit does the following in its LogNormalCatalog class. Note, that this
-account is likely incomplete. First, generate white noise density contrast and
-displacement fields
-\ba
-\delta_G(\vk) &= \sqrt{\frac{P(k)}{2}}\left[n_1(\vk) + i\,n_2(\vk)\right],\\
-\vPsi(\vk) &= i\,\frac{\vk}{k^2}\,\delta_G(\vk)\,,
-\ea
-where $n_i(\vk)$ are sampled from a normal distribution with unit variance.
-Convert to real space,
-\ba
-\delta_G(\vx) &= \int\frac{\dd^3 k}{(2\pi)^3}\,e^{i\vk\cdot\vx}\,\delta_G(\vk)
-\,,\\
-\vPsi(\vx) &= \int\frac{\dd^3 k}{(2\pi)^3}\,e^{i\vk\cdot\vx}\,\vPsi(\vk)\,.
-\ea
-Next, we ensure that the density contrast is within
-$-1\leq\delta(\vx)<\infty$. We start with the Lagrangian bias
-\ba
-b_L &= b - 1\,,
-\ea
-and we perform a lognormal transform
-\ba
-1+\delta(\vq) &= \frac{1}{A}\,e^{b_L \delta_G(\vx)}\,,
-\ea
-where $A$ is chosen such that
-\ba
-\<1+\delta(\vq)\> &= 1\,.
-\ea
-We can derive it to get
-\ba
-A
-&= \<e^{b_L \delta_G(\vq)}\>
-= \sum_m \frac{\<[b_L \delta_G(\vq)]^m\>}{m!}
-\vs
-&= \sum_n \frac{(2n-1)!!\<[b_L\delta_G(\vq)]^2\>^n}{(2n)!}
-\vs
-&= \sum_n \frac{(2n-1)(2n-3)\cdots 1\<[b_L\delta_G(\vq)]^2\>^n}{(2n)(2n-1)(2n-2)\cdots1}
-\vs
-&= \sum_n \frac{\<[b_L\delta_G(\vq)]^2\>^n}{(2n)(2n-2)\cdots1}
-= \sum_n \frac{\<[b_L\delta_G(\vq)]^2\>^n}{2^n(n)(n-1)\cdots1}
-\vs
-&= \sum_n \frac{\<\frac12[b_L\delta_G(\vq)]^2\>^n}{n!}
-= \exp\!\(\frac12\,b_L^2\<\delta_G^2(\vq)\>\).
-\ea
-Then we draw Poisson points at each Lagrangian position $\vq$ with mean
-$[1+\delta(\vq)]\,\nbar$. That is, the number of galaxies within a cell
-centered at $\vq$ is
-\ba
-N(\vq) &\sim \mathrm{Poisson}\([1+\delta(\vq)]\,\nbar\).
-\ea
-Within each cell the galaxies are shifted by a uniform random shift. That gives
-the number of particles at a given Lagrangian position $\vq_i$ with
-displacement $\vPsi_i$. Finally, the particles are moved with the Zel'dovich
-displacement
-\ba
-\vx_i &= \vq_i + \vPsi_i\,,
-\ea
-and the velocity is
-\ba
-\vv_i &= faH \vPsi_i\,.
-\ea
-
-There are some differences. First, the displacement field is added to the
-Lagrangian position. Second, no Hankel transform of the power spectrum. The
-Hankel transfrom is there to ensure the power spectrum of the density field
-equals the input. NBodyKit does not seem to make any such guaranty. For small
-power spectrum amplitudes that shouldn't matter.
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -584,6 +473,100 @@ Requiring the average density contrast to vanish, we get
 \ea
 
 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Power Spectrum Multipoles with FoG}
+Here we aim to incorporate the FoG effect in the multipoles for the plane
+parallel limit. Also, see \citet{Lee:2018JCAP...02..039L}.
+Our model for the power spectrum is
+\ba
+P(k,\mu) &= b^2 (1+\beta\mu^2)^2 \, e^{-\sigma_u^2k^2\mu^2}\,P(k)\,,
+\ea
+where $\beta=f/b$, and to first order we expect
+\ba
+\sigma_u^2 &= \frac{f}{3}\int\frac{\dd^3k}{(2\pi)^3}\,\frac{P_m(k)}{k^2}\,.
+\ea
+The multipole power spectrum is, then,
+\ba
+P_\ell(k) &= \int_{-1}^1\frac{\dd\mu}{2}\,\mathcal{L}_\ell(\mu)\,P(k,\mu) \\
+          &= b^2\big[I^\ell_0(x)+2\beta I^\ell_2(x)+\beta^2I^\ell_4(x)\big] P(k)\,,
+\ea
+where we defined $x = \sigma_u k$ and
+\ba
+I^\ell_n(x) &= \int_{-1}^1 \frac{\dd\mu}{2} \, \mathcal{L}_\ell(\mu) \, \mu^n \, e^{-x^2\mu^2}\,.
+\ea
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{NBodyKit}
+(This section very incomplete!)
+NBodyKit does the following in its LogNormalCatalog class. Note, that this
+account is likely incomplete. First, generate white noise density contrast and
+displacement fields
+\ba
+\delta_G(\vk) &= \sqrt{\frac{P(k)}{2}}\left[n_1(\vk) + i\,n_2(\vk)\right],\\
+\vPsi(\vk) &= i\,\frac{\vk}{k^2}\,\delta_G(\vk)\,,
+\ea
+where $n_i(\vk)$ are sampled from a normal distribution with unit variance.
+Convert to real space,
+\ba
+\delta_G(\vx) &= \int\frac{\dd^3 k}{(2\pi)^3}\,e^{i\vk\cdot\vx}\,\delta_G(\vk)
+\,,\\
+\vPsi(\vx) &= \int\frac{\dd^3 k}{(2\pi)^3}\,e^{i\vk\cdot\vx}\,\vPsi(\vk)\,.
+\ea
+Next, we ensure that the density contrast is within
+$-1\leq\delta(\vx)<\infty$. We start with the Lagrangian bias
+\ba
+b_L &= b - 1\,,
+\ea
+and we perform a lognormal transform
+\ba
+1+\delta(\vq) &= \frac{1}{A}\,e^{b_L \delta_G(\vx)}\,,
+\ea
+where $A$ is chosen such that
+\ba
+\<1+\delta(\vq)\> &= 1\,.
+\ea
+We can derive it to get
+\ba
+A
+&= \<e^{b_L \delta_G(\vq)}\>
+= \sum_m \frac{\<[b_L \delta_G(\vq)]^m\>}{m!}
+\vs
+&= \sum_n \frac{(2n-1)!!\<[b_L\delta_G(\vq)]^2\>^n}{(2n)!}
+\vs
+&= \sum_n \frac{(2n-1)(2n-3)\cdots 1\<[b_L\delta_G(\vq)]^2\>^n}{(2n)(2n-1)(2n-2)\cdots1}
+\vs
+&= \sum_n \frac{\<[b_L\delta_G(\vq)]^2\>^n}{(2n)(2n-2)\cdots1}
+= \sum_n \frac{\<[b_L\delta_G(\vq)]^2\>^n}{2^n(n)(n-1)\cdots1}
+\vs
+&= \sum_n \frac{\<\frac12[b_L\delta_G(\vq)]^2\>^n}{n!}
+= \exp\!\(\frac12\,b_L^2\<\delta_G^2(\vq)\>\).
+\ea
+Then we draw Poisson points at each Lagrangian position $\vq$ with mean
+$[1+\delta(\vq)]\,\nbar$. That is, the number of galaxies within a cell
+centered at $\vq$ is
+\ba
+N(\vq) &\sim \mathrm{Poisson}\([1+\delta(\vq)]\,\nbar\).
+\ea
+Within each cell the galaxies are shifted by a uniform random shift. That gives
+the number of particles at a given Lagrangian position $\vq_i$ with
+displacement $\vPsi_i$. Finally, the particles are moved with the Zel'dovich
+displacement
+\ba
+\vx_i &= \vq_i + \vPsi_i\,,
+\ea
+and the velocity is
+\ba
+\vv_i &= faH \vPsi_i\,.
+\ea
+
+There are some differences. First, the displacement field is added to the
+Lagrangian position. Second, no Hankel transform of the power spectrum. The
+Hankel transfrom is there to ensure the power spectrum of the density field
+equals the input. NBodyKit does not seem to make any such guaranty. For small
+power spectrum amplitudes that shouldn't matter.
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
