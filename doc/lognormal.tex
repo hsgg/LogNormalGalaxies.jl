@@ -385,20 +385,27 @@ where
 \vu(\vk) &= if\,\frac{\vk}{k^2}\,\delta_m(\vk)\,.
 \ea
 We assume that galaxies have the same velocity as the matter.
-
-Modeling for RSD involves
+RSD puts galaxies at
 \ba
 \vvs &= \vr + \frac{\vv\cdot\rhat}{aH}\,\rhat
 = \vr + \(\vu\cdot\rhat\)\rhat\,.
 \ea
+Hence, calculating $\vu$ is needed to get velocities.
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsection{Drawing galaxies}
-Finally, we draw galaxies from the real-space density contrast. The number of
+We draw galaxies from the real-space density contrast. The number of
 galaxies in each grid cell is drawn from a Poisson distribution, and the galaxy
 positions are uniformly drawn inside the grid cell. We assign the same velocity
-to each galaxy within a grid cell.
+to each galaxy within a grid cell. This is similar to NGP assignment.
+
+As a second option, we also allow drawing the position twice: First, uniformly
+within the grid cell, then uniformly within a cubic cloud around the current
+position. This is a convolution of two top-hat distributions. Combined with the
+probability of the neighboring cells, this is the same as drawing from a
+tri-linear interpolation distribution (since Poisson probabilities add), and it
+is similar to CiC on the estimator side.
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
