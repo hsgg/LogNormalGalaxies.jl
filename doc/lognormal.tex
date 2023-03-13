@@ -1,0 +1,862 @@
+%\documentclass[twocolumn]{aastex62}
+\documentclass[aps,prd,reprint,floatfix,superscriptaddress,showkeys,nofootinbib]{revtex4-1}
+
+%\bibliographystyle{apsrev}  % doesn't set links, no title
+\bibliographystyle{apsrev4-2-truncate}
+\setcitestyle{authoryear,round}
+\setlength{\bibsep}{4pt}
+
+
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+
+%\received{\today}
+%\revised{\today}
+%\accepted{\today}
+%\submitjournal{ApJ}
+%\shorttitle{Effect of FoG in $C_\ell$ Space}
+%\shortauthors{Grasshorn Gebhardt et al.}
+
+
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{verbatim}
+\usepackage{rotate}
+\usepackage{color}
+%\usepackage{arydshln}
+\usepackage{bm}
+\usepackage{aas_macros}
+\usepackage{tikz}
+\usetikzlibrary{calc}
+
+% https://tex.stackexchange.com/questions/192610/use-emulateapj-aastex-with-siunitx#269074
+\usepackage{savesym}
+\savesymbol{tablenum}
+\usepackage{siunitx}
+\sisetup{group-separator={,},group-digits=integer}
+\restoresymbol{SIX}{tablenum}
+
+
+\DeclareFontFamily{OT1}{pzc}{}
+\DeclareFontShape{OT1}{pzc}{m}{it}%
+            {<-> s * [1.10] pzcmi7t}{}
+\DeclareMathAlphabet{\mathscr}{OT1}{pzc}%
+                                {m}{it}
+
+
+\definecolor{RedWine}{rgb}{0.743,0,0}
+\definecolor{GrassGreen}{rgb}{0.125,0.75,0.125}
+\definecolor{RoyalBlue}{rgb}{0.25,0.41,0.88}
+\renewcommand{\dj}[1]{\textcolor{RedWine}{\textbf{[DJ: #1]}}}
+\newcommand{\hg}[1]{\textcolor{GrassGreen}{\textbf{(HG: #1)}}}
+
+
+%% definition for equations
+\newcommand{\be}{\begin{equation}}
+\newcommand{\ee}{\end{equation}}
+\newcommand{\bea}{\begin{eqnarray}}
+\newcommand{\eea}{\end{eqnarray}}
+\def\ba#1\ea{\begin{align}#1\end{align}}
+
+\def\({\left(}
+\def\){\right)}
+\def\<{\left\langle}
+\def\>{\right\rangle}
+
+
+%\newcommand{\refeq}[1]{Eq.~(\ref{eq:#1})}
+%\newcommand{\refeqs}[2]{Eqs.~(\ref{eq:#1})--(\ref{eq:#2})}
+%\newcommand{\reffig}[1]{Fig.~\ref{fig:#1}}
+%\newcommand{\refsec}[1]{Sec.~\ref{sec:#1}}
+%\newcommand{\refapp}[1]{App.~\ref{app:#1}}
+%\newcommand{\reftab}[1]{Tab.~\ref{tab:#1}}
+\newcommand{\refeq}[1]{\cref{eq:#1}}
+\newcommand{\refeqs}[2]{\crefrange{eq:#1}{eq:#2}}
+\newcommand{\reffig}[1]{\cref{fig:#1}}
+\newcommand{\refsec}[1]{\cref{sec:#1}}
+\newcommand{\refapp}[1]{\cref{app:#1}}
+\newcommand{\reftab}[1]{\cref{tab:#1}}
+
+\newcommand{\vs}{\nonumber\\} 
+
+\def\vK{{\bm{K}}}
+\def\vR{{\bm{R}}}
+\def\vr{{\bm{r}}}
+\def\vx{{\bm{x}}}
+\def\vv{{\bm{v}}}
+\def\vp{{\bm{p}}}
+\def\vvs{{\bm{s}}}
+\def\vk{{\bm{k}}}
+\def\vY{{\bm{Y}}}
+\def\vy{{\bm{y}}}
+\def\vq{{\bm{q}}}
+\def\vu{{\bm{u}}}
+\def\vgam{{\bm{\gamma}}}
+\def\vPsi{{\bm{\Psi}}}
+
+\def\vecl{\vec{l}}
+\def\vecL{\vec{L}}
+\def\vecv{\vec{v}}
+\def\veck{\vec{k}}
+\def\vecp{\vec{p}}
+\def\vecx{\vec{x}}
+\def\vect{\vec{\theta}}
+
+\def\JM{{(\ell m)}}
+\def\lm{{(\ell m)}}
+\def\zt{\tilde{z}}
+\def\chit{{\tilde\chi}}
+\def\bt{b_e}
+\def\H{\mathcal{H}}
+\def\Gaunt#1#2#3#4#5#6{\mathcal{G}^{#1}_{#4}{}^{#2}_{#5}{}^{#3}_{#6}}
+\def\PA{\mathrm{PA}}
+
+\def\ehat{{\hat{\bm{e}}}}
+\def\nhat{{\hat{\bm{n}}}}
+\def\khat{{\hat{\bm{k}}}}
+\def\Khat{{\hat{\bm{K}}}}
+\def\xhat{{\hat{\bm{x}}}}
+\def\vhat{{\hat{\bm{v}}}}
+\def\phat{{\hat{\bm{p}}}}
+\def\qhat{{\hat{\bm{q}}}}
+\def\rhat{{\hat{\bm{r}}}}
+\def\Rhat{{\hat{\bm{R}}}}
+\def\shat{{\hat{\bm{s}}}}
+\def\yhat{{\hat{\bm{y}}}}
+\def\zhat{{\hat{\bm{z}}}}
+\def\Nbar{{\bar{N}}}
+\def\nbar{{\bar{n}}}
+
+\def\fnl{f_\mathrm{NL}}
+\def\erfc{\mathrm{erfc}}
+\def\Pp{P_\Phi}
+\DeclareMathOperator{\erf}{erf}
+
+\def\orderof{\mathcal{O}}
+\newcommand{\half}[1][1]{\ensuremath{\frac{#1}{2}}}
+\newcommand{\quarter}[1][1]{\ensuremath{\frac{#1}{4}}}
+
+\DeclareSIUnit \parsec {pc}
+\DeclareSIUnit \h {\text{$h$}}
+\DeclareSIUnit \year {yr}
+\DeclareSIUnit \solarmass {M_\odot}
+\DeclareSIUnit \Mpc {\mega\parsec}
+\newcommand{\hMpc}{\ensuremath{\mega\parsec\per\h}}
+
+\def\tot{\rm total}
+\def\oii{\mathrm{OII}}
+\def\oiii{\mathrm{OIII}}
+\def\lae{\mathrm{LAE}}
+\def\lin{\mathrm{lin}}
+\def\hae{\mathrm{HAE}}
+
+\def\th{\mathrm{th}}
+\def\obs{\mathrm{obs}}
+\def\proj{\mathrm{proj}}
+\def\true{\mathrm{true}}
+\def\inferred{\mathrm{inferred}}
+\def\est{\mathrm{est}}  % current estimate (in an iterative setting)
+\def\min{\mathrm{min}}
+\def\max{\mathrm{max}}
+\def\mid{\mathrm{mid}}
+\def\sky{\mathrm{sky}}
+\def\fill{\mathrm{fill}}
+
+\def\xlae{x_\lae}
+\def\xoii{x_\oii}
+\def\Plin{P_{\rm Lin}}
+
+\def\tr{\mathrm{tr}}
+\def\atanh{\mathrm{atanh}}
+
+\def\Like{\mathfrak{L}}
+\def\f{\mathfrak{f}}
+\def\g{\mathfrak{g}}
+\def\ffid{\f_\mathrm{true}}
+\def\gfid{\g_\mathrm{true}}
+\def\Q{{\cal Q}}
+
+\def\dd{\mathrm{d}}
+\def\deriv#1{\mathrm{\romannumeral #1}}
+
+% https://tex.stackexchange.com/questions/33538/how-to-get-an-approximately-proportional-to-symbol
+\def\myapp#1#2{%
+  \mathrel{%
+    \setbox0=\hbox{$#1\sim$}%
+    \setbox2=\hbox{%
+      \rlap{\hbox{$#1\propto$}}%
+      \lower1.1\ht0\box0%
+    }%
+    \raise0.25\ht2\box2%
+  }%
+}
+\def\approxpropto{\mathpalette\myapp\relax}
+
+\newcommand{\incgraph}[2][0.49]{\includegraphics[width=#1\textwidth]{#2}}
+
+\newcommand{\changed}[1]{\textcolor{red}{#1}}
+
+
+\usepackage[colorlinks]{hyperref}
+\usepackage[capitalise]{cleveref}
+\newcommand{\crefrangeconjunction}{--}
+
+
+
+
+\begin{document}
+
+\title{Log-normal simulations}
+
+%\author[0000-0002-8158-0523]{Henry S. Grasshorn Gebhardt}
+\author{Henry S. \surname{Grasshorn Gebhardt}}
+\email{hsg113@psu.edu}
+%\affiliation{Department of Astronomy and Astrophysics and
+%    Institute for Gravitation and the Cosmos, \\
+%    The Pennsylvania State University, University Park, PA 16802, USA
+%}
+
+
+\begin{abstract}
+  Here we give some details on log-normal simulations. The Appendix gives a
+  power spectrum estimator with $\mu$-leakage correction.
+\end{abstract}
+
+\keywords{cosmology; large-scale structure}
+
+
+\maketitle
+\tableofcontents
+
+
+TODO:
+\begin{itemize}
+  \item Plot $P_G(k)$
+  \item Integrate using QuadOsc
+  \item Predict $\frac12\sigma_G^2$.
+  \item Deviations seem to depend mostly on the strength of the RSD, i.e., how
+    large $fD$ is. Nevermind, real-space simulation with large $D$ already
+    shows the problem.
+  \item Properly handle pixel window, in both LogNormalGalaxies.jl and
+    MeasurePowerSpectra.jl. No pixel-window handling in either of those
+    packages should cancel each other. However, I don't observe that, so there
+    is some debugging to do.
+\end{itemize}
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Introduction}
+The density contrast field $\delta(\vx)$ is often treated as Gaussian. However,
+this can lead to $\delta<-1$, which is forbidden by construction. A more
+realistic model, therefore, is a log-normal distribution for $\delta$, which is
+naturally constrained to $\delta\geq-1$.
+
+In this note we investigate how to derive a log-normal simulation. We
+mostly follow \citet{Agrawal+:2017JCAP...10..003A}. This was first done by
+\citet{Coles+:1991MNRAS.248....1C}.
+
+Other codes doing log-normal simulations are FLASK
+\citep{Xavier+:2016MNRAS.459.3693X} and NBodyKit
+\citep{Hand+:2017JCAP...07..002H}. FLASK seems to be overly complicated. You
+provide it $C_\ell(r,r')$ with all the tomographic cross-correlations to make a
+simulation.
+
+Log-normal is not fully described by all its moments
+\citep{Coles+:1991MNRAS.248....1C}. That is, there is another distinct
+distribution that has the same moments.
+
+\citet{Bond+:2000ApJ...533...19B} describe the effect of non-Gaussian
+distribution on the power spectrum estimation. They provide approximations for
+the distribution of the $C_\ell$, and a nice iterative procedure for estimating
+cosmological parameters from the estimated $C_\ell$.
+\citet{Efstathiou+:2001MNRAS.325.1603E} apply this to the APM survey.
+
+
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Log-normal density field}
+We define the log-transformed density field
+\ba
+G(\vx) &= \ln(1+\delta(\vx)) - \<\ln(1+\delta(\vx))\>_\vx\,.
+\ea
+Then,
+\ba
+\label{eq:delta_deltaG}
+\delta(\vx) &= e^{-\frac12\sigma_G^2 + G(\vx)} - 1\,,
+\ea
+where $\sigma_G^2\equiv\<G(\vx)^2\>_\vx$ follows from the requirement that the
+average density contrast $\<\delta\>_\vx=0$ must vanish, and we used that
+$G(\vx)$ is a Gaussian field with vanishing mean so that
+\ba
+\<e^{G}\>
+&= \sum_n \frac{\<G^n\>}{n!}
+= \sum_n \frac{\<G^{2n}\>}{(2n)!}
+= \sum_n \frac{\#\<G^2\>^n}{(2n)!}
+\\
+&= \sum_n \frac{\(\frac12\<G^2\>\)^n}{n!}
+= e^{\frac12\<G^2\>}\,,
+\ea
+where Wick's theorem was used.
+Then, defining
+\ba
+\xi(\vr) &= \<\delta(\vx)\delta(\vx+\vr)\>_\vx\,,
+\ea
+we get
+\ba
+\label{eq:xiG}
+\xi_G(\vr) &= \ln(1 + \xi(\vr))\,,
+\ea
+where we assumed a homogeneous universe.
+To get the normally-distributed power spectrum $P_G(\vq)$, we first
+Fourier-transform the power spectrum $P(\vk)$, apply \refeq{xiG}, and then
+transform to $P_G(\vk)$. That is,
+\ba
+P_G(k)
+&= \int\dd^3\vr \, e^{-i\vk\cdot\vr}
+\, \xi_G(\vr)
+\vs&
+= (2\pi)^3\int_0^\infty\frac{r^2\dd r}{2\pi^2}
+\, j_0(kr)
+\, \xi_G(r)
+\\
+\xi(r)
+&= \int\frac{\dd^3q}{(2\pi)^3} \, e^{i\vq\cdot\vr} \, P(\vq)
+\vs&
+= \int_0^\infty\frac{q^2\dd q}{2\pi^2}
+\, j_0(qr)
+\, P(q)
+\ea
+This allows us to draw the Gaussian field $\delta_G(\vk)$, which we transform
+to configuration space, then apply \refeq{delta_deltaG} to obtain the density
+field.
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Predicting sigma G squared}
+\ba
+\sigma_G^2
+&= \<G^2(\vx)\>
+= \xi^G(0)
+= \ln(1 + \xi(0))
+\vs&
+= \ln\(1 + \int\frac{k^2\dd k}{2\pi^2}\,P(k)\).
+\ea
+This would be the estimate for the fluctuations if the resolution of our
+simulation was infinite. To get the relevant $\sigma_G^2$ at finite resolution,
+we include the pixel window,
+\ba
+\sigma_G^2
+&= \int\dd^3r\,W(\vr)\int\dd^3x\,W(\vx)\<G(\vr)G(\vx)\>
+\\
+&= \int\dd^3r\,W(\vr)\int\dd^3x\,W(\vx)\,\xi_G(\vr-\vx)
+\\
+&= \int\frac{\dd^3k}{(2\pi)^3}\,|\widetilde W(\vk)|^2\,P_G(k)\,.
+\ea
+
+Several things to consider here. First, it appears that in
+\citet{Agrawal+:2017JCAP...10..003A} they only consider power spectra with
+small amplitude. In such cases, the log-normal nature is nearly irrelevant,
+because $\ln(1+\delta)\simeq\delta$. Also, $\xi_G(0)$ is well-defined. Is
+$P_G(0)$ well-defined?
+
+Numerically, I find that the variation of $\sigma_G^2$ from one simulation is
+within machine precision. This seems off to me. Perhaps we can estimate what
+the expectation here is?
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{The Velocity field}
+The velocity field to first order is given by
+\ba
+\vv(\vk) &= aH\vu\,,
+\ea
+where
+\ba
+\vu(\vk) &= if\,\frac{\vk}{k^2}\,\delta_m(\vk)\,.
+\ea
+We assume that galaxies have the same velocity as the matter.
+
+Modeling for RSD involves
+\ba
+\vvs &= \vr + \frac{\vv\cdot\rhat}{aH}\,\rhat
+= \vr + \(\vu\cdot\rhat\)\rhat\,.
+\ea
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Drawing galaxies}
+Finally, we draw galaxies from the real-space density contrast. The number of
+galaxies in each grid cell is drawn from a Poisson distribution, and the galaxy
+positions are uniformly drawn inside the grid cell. We assign the same velocity
+to each galaxy within a grid cell.
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Theory Prediction}
+Here we aim to incorporate the FoG effect in the multipoles for the plane
+parallel limit. Also, see \citet{Lee:2018JCAP...02..039L}.
+Our model for the power spectrum is
+\ba
+P(k,\mu) &= b^2 (1+\beta\mu^2)^2 \, e^{-\sigma_u^2k^2\mu^2}\,P(k)\,,
+\ea
+where $\beta=f/b$, and to first order we expect
+\ba
+\sigma_u^2 &= \frac{f}{3}\int\frac{\dd^3k}{(2\pi)^3}\,\frac{P_m(k)}{k^2}\,.
+\ea
+The multipole power spectrum is, then,
+\ba
+P_\ell(k) &= \int_{-1}^1\frac{\dd\mu}{2}\,\mathcal{L}_\ell(\mu)\,P(k,\mu) \\
+          &= b^2\big[I^\ell_0(x)+2\beta I^\ell_2(x)+\beta^2I^\ell_4(x)\big] P(k)\,,
+\ea
+where we defined $x = \sigma_u k$ and
+\ba
+I^\ell_n(x) &= \int_{-1}^1 \frac{\dd\mu}{2} \, \mathcal{L}_\ell(\mu) \, \mu^n \, e^{-x^2\mu^2}\,.
+\ea
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Options}
+%%%%%%%%%%%%%
+It appears there are two types of log-normals: those that include FoG and those
+that don't. \citet{Agrawal+:2017JCAP...10..003A} seems to not include FoG,
+except for some from nonlinear Jacobian and simply by virtue of approximations
+that add stochasticity. NBodyKit seems to include FoG in the Zel'dovich
+approximation.
+
+\subsection{NBodyKit}
+NBodyKit does the following in its LogNormalCatalog class. Note, that this
+account is likely incomplete. First, generate white noise density contrast and
+displacement fields
+\ba
+\delta_G(\vk) &= \sqrt{\frac{P(k)}{2}}\left[n_1(\vk) + i\,n_2(\vk)\right],\\
+\vPsi(\vk) &= i\,\frac{\vk}{k^2}\,\delta_G(\vk)\,,
+\ea
+where $n_i(\vk)$ are sampled from a normal distribution with unit variance.
+Convert to real space,
+\ba
+\delta_G(\vx) &= \int\frac{\dd^3 k}{(2\pi)^3}\,e^{i\vk\cdot\vx}\,\delta_G(\vk)
+\,,\\
+\vPsi(\vx) &= \int\frac{\dd^3 k}{(2\pi)^3}\,e^{i\vk\cdot\vx}\,\vPsi(\vk)\,.
+\ea
+Next, we ensure that the density contrast is within
+$-1\leq\delta(\vx)<\infty$. We start with the Lagrangian bias
+\ba
+b_L &= b - 1\,,
+\ea
+and we perform a lognormal transform
+\ba
+1+\delta(\vq) &= \frac{1}{A}\,e^{b_L \delta_G(\vx)}\,,
+\ea
+where $A$ is chosen such that
+\ba
+\<1+\delta(\vq)\> &= 1\,.
+\ea
+We can derive it to get
+\ba
+A
+&= \<e^{b_L \delta_G(\vq)}\>
+= \sum_m \frac{\<[b_L \delta_G(\vq)]^m\>}{m!}
+\vs
+&= \sum_n \frac{(2n-1)!!\<[b_L\delta_G(\vq)]^2\>^n}{(2n)!}
+\vs
+&= \sum_n \frac{(2n-1)(2n-3)\cdots 1\<[b_L\delta_G(\vq)]^2\>^n}{(2n)(2n-1)(2n-2)\cdots1}
+\vs
+&= \sum_n \frac{\<[b_L\delta_G(\vq)]^2\>^n}{(2n)(2n-2)\cdots1}
+= \sum_n \frac{\<[b_L\delta_G(\vq)]^2\>^n}{2^n(n)(n-1)\cdots1}
+\vs
+&= \sum_n \frac{\<\frac12[b_L\delta_G(\vq)]^2\>^n}{n!}
+= \exp\!\(\frac12\,b_L^2\<\delta_G^2(\vq)\>\).
+\ea
+Then we draw Poisson points at each Lagrangian position $\vq$ with mean
+$[1+\delta(\vq)]\,\nbar$. That is, the number of galaxies within a cell
+centered at $\vq$ is
+\ba
+N(\vq) &\sim \mathrm{Poisson}\([1+\delta(\vq)]\,\nbar\).
+\ea
+Within each cell the galaxies are shifted by a uniform random shift. That gives
+the number of particles at a given Lagrangian position $\vq_i$ with
+displacement $\vPsi_i$. Finally, the particles are moved with the Zel'dovich
+displacement
+\ba
+\vx_i &= \vq_i + \vPsi_i\,,
+\ea
+and the velocity is
+\ba
+\vv_i &= faH \vPsi_i\,.
+\ea
+
+There are some differences. First, the displacement field is added to the
+Lagrangian position. Second, no Hankel transform of the power spectrum. The
+Hankel transfrom is there to ensure the power spectrum of the density field
+equals the input. NBodyKit does not seem to make any such guaranty. For small
+power spectrum amplitudes that shouldn't matter.
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Conclusion}
+Log-normals for the win!
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%\acknowledgements
+%The authors thank God for pretending to point at us.
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\bibliography{../references}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\appendix
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Log-normal probability distribution}
+We assume that $\delta(\vr)$ is log-normal distributed. The average must
+vanish, by definition, and the power spectrum measures its variance.
+The log-normal is given by the probability distribution
+\ba
+p(\delta) &= \frac{1}{\(1+\delta\)\sqrt{2\pi\sigma^2}}\,
+e^{-\frac{\(\ln(1+\delta) - \mu\)^2}{2\sigma^2}}\,.
+\ea
+The mean and variance are
+\ba
+\<\delta\> &= e^{\mu + \frac12\sigma^2} - 1 \,, \\
+%\<(1+\delta)^2\> - \<1+\delta\>^2 &= e^{2\mu + \sigma^2} \(e^{\sigma^2} - 1\) \,.
+%\\
+\<\delta^2\> -\<\delta\>^2 &= e^{2\mu + \sigma^2} \(e^{\sigma^2} - 1\) \,.
+\ea
+Requiring $\<\delta\>=0$, we get
+\ba
+\<\delta^2\> &= e^{\sigma^2} - 1\,.
+\ea
+To get the correlation function, we need to get the covariance between
+$\delta$'s at different locations in space. The log-normal distribution for
+this is given in \citet{Coles+:1991MNRAS.248....1C}:
+\ba
+p(\vec\delta)
+             &= \frac{1}{\sqrt{(2\pi)^N\det{\Sigma_G}}}
+             \left[ \prod_s \frac{1}{1 + \delta_s} \right]
+\vs&\quad\times
+             e^{-\frac12\sum_{ij}[\ln(1+\delta_i)-\mu_i] \(\Sigma_G^{-1}\)_{ij} [\ln(1+\delta_j) - \mu_j]}
+\ea
+for the density contrast $\delta_i=\delta(\vr_i)$. Define
+\ba
+G_i &= \ln(1+\delta_i) - \mu_i \,, \\
+p_G(\vec G)
+    &= \frac{1}{\sqrt{(2\pi)^N\det{\Sigma_G}}}
+    \, e^{-\frac12\sum_{ij}G_i \(\Sigma_G^{-1}\)_{ij} G_j}\,.
+\ea
+Then, the mean and variance are
+\ba
+\<\delta_i\>
+    &= e^{\mu_i + \frac12\Sigma_{ii}} - 1 \,,\\
+\<\(\delta_i - \<\delta_i\>\)\(\delta_j - \<\delta_j\>\)\>
+    &= e^{\mu_i + \mu_j + \frac12\(\Sigma_{ii} + \Sigma_{jj}\)}
+    \(e^{\Sigma_{ij}} - 1\)\,.
+\ea
+Requiring the average density contrast to vanish, we get
+\ba
+\mu_i &= -\frac12\Sigma_{ii}\,,
+\\
+\<\delta_i \delta_j\>
+    &= e^{\Sigma_{ij}} - 1\,.
+\ea
+
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Measuring the Power Spectrum and its Multipoles}
+
+In this section we show how to measure the multipoles of the power spectrum.
+The presentation here largely follows \citet{Agrawal+:2017JCAP...10..003A}.
+
+
+%%%%%%%%%%%%%%%
+\subsection{Density Contrast}
+Here we will focus on the density contrast
+\ba
+\delta(\vx) &\equiv \frac{n(\vx)}{\bar n} - 1
+\ea
+If we assign a galaxy to its nearest grid point, then we estimate the density
+contrast as
+\ba
+\label{eq:delta_x_winfn}
+1 + \delta^\obs(\vx) &= \int\dd^3x' \, W(\vx-\vx') \(1 + \delta(\vx')\)
+\ea
+More on grid assignment in \cref{sec:grid_assignment}
+Then,
+\ba
+\delta^\obs(\vk)
+%&= \int\dd^3x \, e^{-i\vk\cdot\vx} \, \delta^\obs(\vx)
+= \widetilde W(\vk)\, \delta(\vk)\,.
+\ea
+For discrete galaxies at positions $\vx_g$ the density is modeled as
+$\(1+\delta(\vx')\)\bar{n}=\sum_g\delta^D(\vx'-\vx_g)$. Hence, if we assign
+galaxies to their nearest grid point $\vx$, then the observed density contrast
+at $\vx$ will be given by \refeq{delta_x_winfn} with a top-hat window function,
+\ba
+W(\vx-\vx') &= \prod_i \frac{1}{H} \, \mathcal{T}\(\frac{x_i-x'_i}{H}\)\,,
+\ea
+where the product is over the three dimensions $x$, $y$, and $z$, and the
+top-hat is defined as
+\ba
+\mathcal{T}(x) &= \begin{cases}
+    1 & \text{if } |x| < \frac12\,, \\
+    \frac12 & \text{if } |x| = \frac12\,, \\
+    0 & \text{otherwise.}
+\end{cases}
+\ea
+Then,
+\ba
+\widetilde W(\vk)
+&= \prod_i\int_{-1/2}^{1/2}\dd u_i \, e^{-iHk_iu_i}
+\vs
+&= \prod_i j_0\!\(\frac{Hk_i}{2}\)
+\vs
+&= \prod_i j_0\!\(\frac{L_i k_i}{2n_i}\)
+\ea
+
+Including the alias effect, we have $\widetilde W(\vk)=1$ for NGP.
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Discrete Fourier Transform}
+We definet the Fourier transform as
+\ba
+\delta(k)
+&= \int\dd x\, e^{-ikx} \, \delta(x)
+\vs
+&= \frac{L}{N} \sum_n e^{-iLkn/N} \, \delta(x_n)
+\vs
+&= \frac{L}{N} \, \mathrm{FFT}\left[\delta(x)\right](k)
+\ea
+with $k_F=2\pi/L$.
+and the inverse
+\ba
+\delta(x)
+&= \int\frac{\dd k}{2\pi}\,e^{ikx}\,\delta(k)
+\vs
+&= \frac{1}{L}\,\frac{N}{N}\sum_k e^{ikx}\,\delta(k)
+\vs
+&= \frac{N}{L}\,\mathrm{IFFT}\left[\delta(k)\right](x)
+\ea
+
+
+
+
+%%%%%%%%%%%%%%%%
+\subsection{Measuring the full Power Spectrum}
+The power spectrum is
+\ba
+\hat P(k,\mu,\phi)
+&= W_\mathrm{mesh,a}^{-1}(\vk) \, W_\mathrm{mesh,b}^{-1}(\vk)
+  \vs&\quad\times
+\Big[
+  \Re\(\delta_a^*(\vk) \delta_b(\vk)\)
+  %\vs&\qquad
+  - P_\mathrm{shot,ab}
+\Big]\,,
+\ea
+where
+\ba
+W_\mathrm{mesh}
+&= \left[
+\mathop{j_0}\!\(\frac{k_xH}{2}\)
+\mathop{j_0}\!\(\frac{k_yH}{2}\)
+\mathop{j_0}\!\(\frac{k_zH}{2}\)
+\right]^p\,,
+\ea
+where $j_0(x)=\sin(x)/x$ is the spherical Bessel function.
+For NGP, $p=1$, for CIC, $p=2$, for TSC, $p=3$.
+The shot noise is
+\ba
+P_\mathrm{shot,ab}
+&= \frac{\delta^K_{ab}}{\bar n_a}\,.
+\ea
+
+
+%%%%%%%%%%%%%%%%
+\subsection{Measuring Multipoles of the Power Spectrum}
+The multipole power spectrum $P_\ell(k)$ is defined s.t.\ 
+\ba
+\label{eq:multipole_def}
+P(k,\mu) &= \sum_{l=0}^\infty P_l(k) \mathcal{L}_l(\mu)\,,
+\ea
+where $\mathcal{L}_m(\mu)$ are the Legendre polynomials. The Legendre
+polynomials obey the orthogonality relation
+\ba
+\int_{-1}^1\dd\mu\,\mathcal{L}_m(\mu)\,\mathcal{L}_n(\mu)
+&= \frac{2}{2m+1}\,\delta^K_{mn}\,.
+\ea
+This allows us to invert \refeq{multipole_def}. When measuring the power
+spectrum from data on a grid, however, we must discretize the integral. Then,
+as a first estimate for the multipoles, we obtain
+\ba
+\label{eq:multipole_brute_estimate}
+\hat P_m(k)
+&= \sum_{\mu,\phi} \hat P(k,\mu,\phi) \, \mathcal{L}_m(\mu)
+%= \sum_{\mu,\phi} \sum_{l=0}^\infty P_l(k)\,\mathcal{L}_l(\mu)\,\mathcal{L}_m(\mu)
+= \sum_{l=0}^\infty P_l(k) \, \mathcal{M}_{lm}(k)\,,
+\ea
+where we assume that the power spectrum is independent of $\phi$ and
+\ba
+\mathcal{M}_{lm}(k)
+&= \sum_{\mu,\phi} \mathcal{L}_l(\mu)\,\mathcal{L}_m(\mu)
+\ea
+is the $\mu$-leakage matrix. The $k$-dependence comes from the sum over $\mu$,
+which depends on the grid of the data. Inverting
+\refeq{multipole_brute_estimate}, we get a precise estimate for the multipole
+moments
+\ba
+P_l(k) &= \sum_{m=0}^{l_\max} \hat P_m(k) \, \mathcal{M}^{-1}_{lm}(k)\,.
+\ea
+The sum over $m$ should go from zero to infinity. However, if there are only
+$N_k=\mathcal{M}_{00}$ modes, then we can only measure up to $l=N_k-1$. For
+larger multipoles, $\mathcal{M}$ will be singular and not invertible.
+Furthermore, we only consider multipoles up to some $l_\mathrm{max}$. Thus, for
+a given mode, the $\mu$-leakage matrix $\mathcal{M}_{lm}$ will only consist of
+entries $l,m\leq\min(N_k-1,l_\mathrm{max})$.
+
+Due to the finite width of the $k$-bins, we must estimate the mean $k$ at which
+the multipole moment is measured. We do this by taking the average $k$ within
+the bin, giving each mode the same weight. That is
+\ba
+k &= \frac{1}{N_k} \sum_{\mu,\phi} k_i\,,
+\ea
+where the sum goes over all the modes $k_i$ within the $k$-bin, and
+$N_k=\mathcal{M}_{00}$ is the number of modes.
+
+
+%%%%%%%%%%%%%%%%%
+\subsection{Grid Assignment}
+\label{sec:grid_assignment}
+Here we detail the grid assignment schemes NGP, CiC, TSC, PSC. The key question
+is how to estimate the number density $n(\vr)$ on a grid from discrete points.
+
+Following \citet{Hockney+,Jing:2005ApJ...620..559J}, each galaxy is modeled as
+having a shape $S(\vx - \vx_i)$. Whichever portion of that shape falls within a
+given grid cell is then the weight assigned to that grid cell.
+
+The shape function for a galaxy at position $\vx_i$ considered are
+\ba
+S_\mathrm{NGP}(\vx - \vx_i) &= \delta^D\!\(\frac{\vx - \vx_i}{H}\)\,,
+\\
+S_\mathrm{CIC}(\vx - \vx_i) &= [\delta^D \star \mathcal{T}^3]\!\(\frac{\vx - \vx_i}{H}\)\,,
+\\
+S_\mathrm{TSC}(\vx - \vx_i) &= [\delta^D \star \mathcal{T}^3 \star \mathcal{T}^3]\!\(\frac{\vx - \vx_i}{H}\)\,,
+\\
+S_\mathrm{PSC}(\vx - \vx_i) &= [\delta^D \star \mathcal{T}^3 \star \mathcal{T}^3 \star \mathcal{T}^3]\!\(\frac{\vx - \vx_i}{H}\)\,,
+\ea
+where $\star$ denotes a convolution. Explicitly,
+\ba
+S_\mathrm{CIC}(\vx - \vx_i)
+&= \int\frac{\dd^3r}{H^3}\, \delta^D\!\(\frac{\vx - \vx_i - \vr}{H}\) \mathcal{T}^3\!\(\frac{\vr}{H}\)
+\\
+&= \mathcal{T}^3\!\(\frac{\vx - \vx_i}{H}\)\,.
+\ea
+Or,
+\ba
+S_\mathrm{TSC}(\vx - \vx_i)
+&= \int\frac{\dd^3r}{H^3}\, \mathcal{T}^3(\vx - \vx_i - \vr) \mathcal{T}^3\!\(\frac{\vr}{H}\).
+\ea
+And
+\begin{widetext}
+\ba
+S_\mathrm{PSC}(\vx - \vx_i)
+&= \int\dd^3r'\, S_\mathrm{TSC}(\vx - \vx_i - \vr') \mathcal{T}^3\!\(\vr'\)
+\\
+&= \int\dd^3r'
+\int\dd^3r \mathcal{T}^3(\vx - \vx_i - \vr' - \vr) \mathcal{T}^3(\vr)
+\mathcal{T}^3\!\(\vr'\)
+\\
+&= \int\dd^3r''\, \mathcal{T}^3(\vr'')
+\int\dd^3r'\, \mathcal{T}^3(\vr')
+\int\dd^3r\, \mathcal{T}^3(\vr)
+\,\delta^D(\vx - \vx_i - \vr - \vr' - \vr'')
+\\
+&= \prod_{\mu\in\{x,y,z\}}
+\int\dd r_\mu''\, \mathcal{T}(r_\mu'')
+\int\dd r_\mu'\, \mathcal{T}(r_\mu')
+\int\dd r_\mu\, \mathcal{T}(r_\mu)
+\,\delta^D(x_\mu - x^i_\mu - r_\mu - r_\mu' - r_\mu'')
+\\
+&= \prod_{\mu\in\{x,y,z\}}
+\int_{-\frac12}^\frac12\dd r_\mu''
+\int_{-\frac12}^\frac12\dd r_\mu'
+\int_{-\frac12}^\frac12\dd r_\mu
+\,\delta^D(x_\mu - x^i_\mu - r_\mu - r_\mu' - r_\mu'')
+\\
+&= \prod_{\mu\in\{x,y,z\}}
+\int_{-\frac12}^\frac12\dd r_\mu'
+\int_{-\frac12}^\frac12\dd r_\mu
+\begin{cases}
+  1 & \text{ for } -\frac12 < x_\mu - x^i_\mu - r_\mu - r_\mu' < \frac12\,,
+  \\
+  0 & \text{ otherwise. }
+\end{cases}
+\\
+&= \prod_{\mu\in\{x,y,z\}}
+\int_{-\frac12}^\frac12\dd r_\mu'
+\int_{-\frac12}^\frac12\dd r_\mu
+\begin{cases}
+  1 & \text{ for } -\frac12 < x_\mu - x^i_\mu - r_\mu - r_\mu' < \frac12\,,
+  \\
+  0 & \text{ otherwise. }
+\end{cases}
+\ea
+\end{widetext}
+Nah, there's got to be a better way. The Fourier transform of the top-hat is
+\ba
+\widetilde{\mathcal{T}}(k_\mu) = \frac{\sin\!\(\frac{H k_\mu}{2}\)}{\frac{H k_\mu}{2}}.
+\ea
+Since the shape function is a convolution of several top-hats,
+\ba
+S_p(\vx - \vx_i) = [\star\mathcal{T}]^{p-1}(\vx - \vx_i)\,,
+\ea
+by the convolution theorem we get in Fourier space
+\ba
+\widetilde S_p(\vk) &= \widetilde{\mathcal{T}}^{p-1}(\vk)\,.
+\ea
+And
+\ba
+S_p(\vx - \vx_i)
+&= \int\frac{\dd^3k}{(2\pi)^3}\,e^{i \vk\cdot(\vx - \vx_i)}\,\widetilde S_p(\vk)
+\\
+&= \int\frac{\dd^3k}{(2\pi)^3}\,e^{i \vk\cdot(\vx - \vx_i)}\,\widetilde{\mathcal{T}}^p(\vk)
+\ea
+In the $x$-direction, substituting $\kappa=Hk_x/2$,
+\ba
+S_p(x - x_i)
+&= \int\frac{\dd k_x}{2\pi}\,e^{i k_x (x - x_i)}\,\widetilde{\mathcal{T}}^p(k_x)
+\\
+&= \frac{2}{H}\int\frac{\dd \kappa}{2\pi}\,e^{i \kappa \frac{2}{H}(x - x_i)}
+\left[\frac{\sin(\kappa)}{\kappa}\right]^p.
+\ea
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%\subsection{Multipole Error Estimate}
+
+
+
+
+
+
+
+\end{document}
+
+
+
+% vim: set sw=2 sts=2 et :
