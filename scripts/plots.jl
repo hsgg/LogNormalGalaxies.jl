@@ -1,22 +1,26 @@
+using Revise
+using Pkg
+Pkg.activate((@__DIR__)*"/..")
+
 using LogNormalGalaxies
 using PyPlot
-using Test
 using DelimitedFiles
 using Splines
 
 
-@testset "pk_to_pkG()" begin
-    #data = readdlm((@__DIR__)*"/matterpower.dat", comments=true)
-    #in_k = data[:,1]
-    #in_pk = data[:,2]
+function plot_pk_pkG()
+    data = readdlm((@__DIR__)*"/../test/matterpower.dat", comments=true)
+    in_k = data[:,1]
+    in_pk = data[:,2]
 
-    in_k = readdlm(homedir() * "/MeasurePowerSpectra.jl/inputs/kh_camb_z_eff=0.38.csv")[:]
-    in_pk = readdlm(homedir() * "/MeasurePowerSpectra.jl/inputs/matter_power_spectrum_pk_camb_z_eff=0.38.csv")[:]
+    #in_k = readdlm(homedir() * "/MeasurePowerSpectra.jl/inputs/kh_camb_z_eff=0.38.csv")[:]
+    #in_pk = readdlm(homedir() * "/MeasurePowerSpectra.jl/inputs/matter_power_spectrum_pk_camb_z_eff=0.38.csv")[:]
 
     pkfn = Spline1D(in_k, in_pk, extrapolation=Splines.powerlaw)
 
     k = 10.0 .^ (-4:0.01:0)
-    DD = [0.1, 0.2, 0.4, 0.8, 1.6]
+    #DD = [0.1, 0.2, 0.4, 0.8]
+    DD = [1.0, 0.5, 0.25, 0.125]
     pk = fill(NaN, length(k), length(DD))
     pkG = fill(NaN, length(k), length(DD))
     lab_delta = []
@@ -35,6 +39,11 @@ using Splines
     plot(k, pk, "--", c="0.75", label=lab_delta)
     plot(k, pkG, label=lab_G)
     legend(ncols=2)
-    xlabel(L"k")
-    ylabel(L"P(k)")
+    xlabel(L"$k$ in [$h$/Mpc]")
+    ylabel(L"$P(k)$ in [Mpc/$h$]$^3$")
+    mkpath((@__DIR__)*"/../doc/figs/")
+    savefig((@__DIR__)*"/../doc/figs/pk_pkG")
 end
+
+
+plot_pk_pkG()
