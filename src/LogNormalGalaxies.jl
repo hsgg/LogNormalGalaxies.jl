@@ -231,11 +231,8 @@ function draw_galaxies_with_velocities(deltar, vx, vy, vz, Ngalaxies, Δx=[1.0,1
                     xyzv[g0+5] = vy[mod1(ijk[1],end), mod1(ijk[2],end), mod1(ijk[3],end)]
                     xyzv[g0+6] = vz[mod1(ijk[1],end), mod1(ijk[2],end), mod1(ijk[3],end)]
                 elseif velocity_assignment == 2
-                    # Find "bottom-left" grid point of octant, relative to
-                    # (ig,jg,kg), the center of which is at (ig-0.5, jg-0.5,
-                    # kg-0.5).
-                    Δijk0 = @. - Int((x, y, z) - (ig-0.5, jg-0.5, kg-0.5) < 0)
-                    ijk0 = @. (ig, jg, kg) + Δijk0
+                    # Tri-linear interpolation
+                    ijk0 = @. floor(Int, (x,y,z) + 0.5)
                     x0 = @. ijk0 - 0.5
                     pnvx.ijk .= ijk0
                     pnvy.ijk .= ijk0
@@ -247,9 +244,8 @@ function draw_galaxies_with_velocities(deltar, vx, vy, vz, Ngalaxies, Δx=[1.0,1
                     xyzv[g0+5] = interp_vy((x,y,z))
                     xyzv[g0+6] = interp_vz((x,y,z))
                 elseif velocity_assignment == 3
-                    # Average of nearest cells
-                    Δijk0 = @. - Int((x, y, z) - (ig-0.5, jg-0.5, kg-0.5) < 0)
-                    ijk0 = @. (ig, jg, kg) + Δijk0
+                    # Average of 2x2x2 nearest cells
+                    ijk0 = @. floor(Int, (x,y,z) + 0.5)
                     pnvx.ijk .= ijk0
                     pnvy.ijk .= ijk0
                     pnvz.ijk .= ijk0
@@ -258,6 +254,64 @@ function draw_galaxies_with_velocities(deltar, vx, vy, vz, Ngalaxies, Δx=[1.0,1
                         xyzv[g0+5] += pnvy[di,dj,dk] / 8
                         xyzv[g0+6] += pnvz[di,dj,dk] / 8
                     end
+                elseif velocity_assignment == 4
+                    # Average over 1x1x1 cloud
+                    ijk0 = @. floor(Int, (x,y,z) + 0.5)
+                    pnvx.ijk .= ijk0
+                    pnvy.ijk .= ijk0
+                    pnvz.ijk .= ijk0
+                    tot_weight = 0.0
+                    for di=1:2, dj=1:2, dk=1:2
+                        xyz_neighbor = @. (ijk0 + (di-1,dj-1,dk-1) - 0.5)
+                        xyz_overlap = @. 1 - abs((x,y,z) - xyz_neighbor)
+                        volume_overlap = prod(xyz_overlap)
+                        xyzv[g0+4] += pnvx[di,dj,dk] * volume_overlap
+                        xyzv[g0+5] += pnvy[di,dj,dk] * volume_overlap
+                        xyzv[g0+6] += pnvz[di,dj,dk] * volume_overlap
+                        tot_weight += volume_overlap
+                    end
+                    #@show tot_weight
+                    @assert tot_weight ≈ 1  # sanity check
+                elseif velocity_assignment == 5
+                    # Average over 3x3x3 nearest grids
+                    ijk0 = @. round(Int, (x,y,z) + 0.5)
+                    pnvx.ijk .= ijk0
+                    pnvy.ijk .= ijk0
+                    pnvz.ijk .= ijk0
+                    tot_weight = 0.0
+                    for di=0:2, dj=0:2, dk=0:2
+                        volume_overlap = 1 / 27
+                        xyzv[g0+4] += pnvx[di,dj,dk] * volume_overlap
+                        xyzv[g0+5] += pnvy[di,dj,dk] * volume_overlap
+                        xyzv[g0+6] += pnvz[di,dj,dk] * volume_overlap
+                        tot_weight += volume_overlap
+                    end
+                    #@show tot_weight
+                    @assert tot_weight ≈ 1  # sanity check
+                elseif velocity_assignment == 6
+                    # Average over 2x2x2 cloud
+                    #xyz = (x,y,z)
+                    xyz = (ig-0.5, jg-0.5, kg-0.5)
+                    ijk0 = @. round(Int, xyz + 0.5)
+                    pnvx.ijk .= ijk0
+                    pnvy.ijk .= ijk0
+                    pnvz.ijk .= ijk0
+                    tot_weight = 0.0
+                    for di=0:2, dj=0:2, dk=0:2
+                        xyz_neighbor = @. (ijk0 + (di-1,dj-1,dk-1) - 0.5)
+                        distance = @. abs(xyz - xyz_neighbor)
+                        @assert all(distance .<= 1.5)
+                        xyz_overlap = @. ifelse(distance > 0.5, 1.5 - distance, 1.0)
+                        volume_overlap = prod(xyz_overlap) / 8
+                        xyzv[g0+4] += pnvx[di,dj,dk] * volume_overlap
+                        xyzv[g0+5] += pnvy[di,dj,dk] * volume_overlap
+                        xyzv[g0+6] += pnvz[di,dj,dk] * volume_overlap
+                        #println("===")
+                        #@show (di,dj,dk) xyz xyz_neighbor distance xyz_overlap volume_overlap
+                        tot_weight += volume_overlap
+                    end
+                    #@show tot_weight
+                    @assert tot_weight ≈ 1  # sanity check
                 end
 
             end # else xyzv[4:6] = 0
