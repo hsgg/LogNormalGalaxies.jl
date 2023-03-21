@@ -1,3 +1,5 @@
+#!/usr/bin/env julia
+
 using Revise
 using Pkg
 Pkg.activate((@__DIR__)*"/..")
@@ -41,8 +43,8 @@ function plot_pk_pkG()
     legend(ncols=2)
     xlabel(L"$k$ in [$h$/Mpc]")
     ylabel(L"$P(k)$ in [Mpc/$h$]$^3$")
-    mkpath((@__DIR__)*"/../doc/figs/")
-    savefig((@__DIR__)*"/../doc/figs/pk_pkG")
+    mkpath((@__DIR__)*"/../figs/")
+    savefig((@__DIR__)*"/../figs/pk_pkG")
 end
 
 
