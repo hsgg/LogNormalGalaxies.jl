@@ -218,10 +218,12 @@ function draw_galaxies_with_velocities(deltar, vx, vy, vz, Ngalaxies, Δx=[1.0,1
 
             if rsd
                 if velocity_assignment == 0
+                    # Current grid point
                     xyzv[g0+4] = vx[i,j,k]
                     xyzv[g0+5] = vy[i,j,k]
                     xyzv[g0+6] = vz[i,j,k]
                 elseif velocity_assignment == 1
+                    # Nearest grid point
                     # If voxel_window_power>=2, then maybe we want to use the
                     # nearest grid point for the velocity:
                     ijk = @. round(Int, (x,y,z) + 0.5) + 0

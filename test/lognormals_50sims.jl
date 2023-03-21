@@ -1,4 +1,5 @@
 using LogNormalGalaxies
+using Test
 
 module lognormals
 
@@ -11,6 +12,7 @@ using Random
 using DelimitedFiles
 #using MPI
 using Statistics
+using PlaneParallelRedshiftSpaceDistortions
 
 
 function Arsd_Kaiser(β, ℓ)
@@ -26,7 +28,7 @@ function Arsd_Kaiser(β, ℓ)
 end
 
 
-function generate_sims(pk, nbar, b, f, L, n_sim, n_est, nrlz; rfftplanner=LogNormalGalaxies.plan_with_fftw, sim_vox=0, est_vox=0, sim_velo=1, grid_assignment=1, fxshift_est=0, fxshift_sim=0, generate=true)
+function generate_sims(pk, nbar, b, f, L, n_sim, n_est, nrlz; rfftplanner=LogNormalGalaxies.plan_with_fftw, sim_vox=0, est_vox=0, sim_velo=1, grid_assignment=1, fxshift_est=0, fxshift_sim=0, generate=true, sigma_psi=0.0)
     LLL = [L, L, L]
     nnn_sim = [n_sim, n_sim, n_sim]
     nnn_est = [n_est, n_est, n_est]
@@ -36,7 +38,7 @@ function generate_sims(pk, nbar, b, f, L, n_sim, n_est, nrlz; rfftplanner=LogNor
     #Lx, Ly, Lz = L, 0.7L, 0.5L
     #nx, ny, nz = n, floor(Int, 0.7n), floor(Int, 0.5n)
 
-    sim_opts = (nmesh=n_sim, bias=b, rfftplanner=rfftplanner, voxel_window_power=sim_vox, velocity_assignment=sim_velo)
+    sim_opts = (nmesh=n_sim, bias=b, rfftplanner=rfftplanner, voxel_window_power=sim_vox, velocity_assignment=sim_velo, sigma_psi=sigma_psi)
     est_opts = (nbar=nbar, lmax=4, do_mu_leakage=true, subtract_shotnoise=true, voxel_window_power=est_vox, grid_assignment=grid_assignment)
 
     x⃗ = fill(0.0, 3, 1)
@@ -153,17 +155,18 @@ function agrawal_fig2()
         f = 0.71
         #f = 0
         D = 1
-        nbar = 1e-3
-        L = 1e3
+        nbar = 3e-4
+        L = 3e3
         n_sim = 256
         n_est = 256
-        nrlz = 10
-        sim_vox = 1
+        nrlz = 100
+        sim_vox = 2
         est_vox = 0
-        sim_velo = 1
+        sim_velo = 6
         grid_assignment = 1
         fxshift_sim = 0
         fxshift_est = 0
+        sigma_psi = 0
     end
 end
 function agrawal_fig6_fig7()
@@ -182,6 +185,7 @@ function agrawal_fig6_fig7()
         grid_assignment = 1
         fxshift_sim = 0
         fxshift_est = 0
+        sigma_psi = 0
     end
 end
 
@@ -203,38 +207,41 @@ function main(fbase, rfftplanner=LogNormalGalaxies.plan_with_fftw)
     fname = make_fname("out/"*fbase; nbar, b, D, f, L, n_sim, n_est, sim_vox, est_vox, sim_velo, grid_assignment, nrlz, fxshift_est, fxshift_sim)
 
     println("Running with $(rfftplanner)...")
-    km, pkm, nmodes, pkm_err = generate_sims(pk, nbar, b, f, L, n_sim, n_est, nrlz; rfftplanner, sim_vox, est_vox, sim_velo, grid_assignment, fxshift_est, fxshift_sim, generate)
+    km, pkm, nmodes, pkm_err = generate_sims(pk, nbar, b, f, L, n_sim, n_est, nrlz; rfftplanner, sim_vox, est_vox, sim_velo, grid_assignment, fxshift_est, fxshift_sim, generate, sigma_psi)
     writedlm(fname, [km pkm nmodes pkm_err])
     km, pkm, nmodes, pkm_err = readdlm_cols(fname, [1, 2:6, 7, 8:12])
 
     # theory
     β = f / b
-    pkm_kaiser = @. b^2 * Arsd_Kaiser(β, (0:4)') * pk(km)
+    #pkm_kaiser = @. b^2 * Arsd_Kaiser(β, (0:4)') * pk(km)
+    pkm_kaiser = @. b^2 * Arsd_l_exp(km*f*sigma_psi, β, (0:4)') * pk(km)
 
 
     #close("all")  # close previous plots to prevent plotcapolypse
 
     # plot
     figure()
-    make_title(; L, D, f, n_sim, n_est, sim_vox, est_vox, sim_velo, grid_assignment)
+    make_title(; L, D, f, n_sim, n_est, sim_vox, est_vox, sim_velo)#, grid_assignment)
     hlines(1/nbar, extrema(km)..., color="0.75", label="Shot noise")
-    plot(km, b^2 .* pk.(km), "k", label="input \$k\\,P(k)\$")
+    n = 0
+    plot(km, km.^n .* b^2 .* pk.(km), "k", label="input \$k^$n P(k)\$")
     for m=1:size(pkm,2)
-        errorbar(km, pkm[:,m], pkm_err[:,m], c="C$(m-1)", alpha=0.7)
-        errorbar(km, pkm[:,m], pkm_err[:,m] ./ sqrt(nrlz), c="C$(m-1)", elinewidth=4, alpha=0.7)
-        plot(km, pkm[:,m], "C$(m-1)-", label="\$P_{$(m-1)}(k)\$", alpha=0.7)
-        plot(km, pkm_kaiser[:,m], "C$(m-1)--", alpha=0.7)
+        errorbar(km, km.^n.*pkm[:,m], km.^n.*pkm_err[:,m], c="C$(m-1)", alpha=0.7)
+        errorbar(km, km.^n.*pkm[:,m], km.^n.*pkm_err[:,m] ./ sqrt(nrlz), c="C$(m-1)", elinewidth=4, alpha=0.7)
+        plot(km, km.^n.*pkm[:,m], "C$(m-1)-", label="\$k^$n P_{$(m-1)}(k)\$", alpha=0.7)
+        plot(km, km.^n.*pkm_kaiser[:,m], "C$(m-1)--", alpha=0.7)
     end
     xlabel(L"k")
-    ylabel(L"P_\ell(k)")
+    ylabel("\$k^$n P_\\ell(k)\$")
     xscale("log")
-    xlim(right=0.6)
+    xlim(right=0.3)
     legend(fontsize="small")
     savefig((@__DIR__)*"/$(fbase).pdf")
 
+    #return
 
     figure()
-    make_title(; L, D, f, n_sim, n_est, sim_vox, est_vox, sim_velo, grid_assignment, xshift=fxshift_est)
+    make_title(; L, D, f, n_sim, n_est, sim_vox, est_vox, sim_velo, #=grid_assignment,=# xshift=fxshift_est)
     hlines(1, extrema(km)..., color="0.8")
     hlines([0.99,1.01], extrema(km)..., color="0.7", linestyle="--")
     hlines([0.95,1.05], extrema(km)..., color="0.6", linestyle=":")
@@ -250,7 +257,7 @@ function main(fbase, rfftplanner=LogNormalGalaxies.plan_with_fftw)
     xlabel(L"k")
     ylabel(L"\hat P^{\rm pp}_\ell(k) / P^{\rm Kaiser}_\ell(k)")
     #xscale("log")
-    xlim(left=0, right=0.5)
+    xlim(left=0, right=0.25)
     ylim(0.9, 1.1)
     legend(fontsize="small")
     savefig((@__DIR__)*"/$(fbase)_rdiff.pdf")
