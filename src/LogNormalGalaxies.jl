@@ -435,7 +435,7 @@ end
 # their interface.
 
 # simulate galaxies
-function simulate_galaxies(nxyz, Lxyz, Ngalaxies, pk, b, faH; rfftplan=default_plan(nxyz), rng=Random.GLOBAL_RNG, voxel_window_power=1, velocity_assignment=1, sigma_psi=0.0, fixed=false)
+function simulate_galaxies(nxyz, Lxyz, Ngalaxies, pk, b, faH; rfftplan=default_plan(nxyz), rng=Random.GLOBAL_RNG, voxel_window_power=1, velocity_assignment=1, sigma_psi=0.0, fixed=false, gather=true)
     nx, ny, nz = nxyz
     Lx, Ly, Lz = Lxyz
     Volume = Lx * Ly * Lz
@@ -541,6 +541,10 @@ function simulate_galaxies(nxyz, Lxyz, Ngalaxies, pk, b, faH; rfftplan=default_p
         @time @strided @. xyzv[4:6,:] *= faH
     end
 
+    if gather
+        xyzv = concatenate_mpi_arr(xyzv)
+    end
+
     @show Sys.maxrss() / 2^30
     return xyzv
 end
@@ -548,7 +552,7 @@ end
 
 function simulate_galaxies(nbar, Lbox, pk; nmesh=256, bias=1.0, f=false,
         rfftplanner=default_plan, rng=Random.GLOBAL_RNG, voxel_window_power=1,
-        velocity_assignment=1, sigma_psi=0.0, fixed=false)
+        velocity_assignment=1, sigma_psi=0.0, fixed=false, gather=true)
 
     if nmesh isa Number
         nxyz = nmesh, nmesh, nmesh
@@ -569,11 +573,13 @@ function simulate_galaxies(nbar, Lbox, pk; nmesh=256, bias=1.0, f=false,
 
     @time xyzv = simulate_galaxies(nxyz, Lxyz, Ngalaxies, pk, bias, f;
                                    rfftplan, rng, voxel_window_power,
-                                   velocity_assignment, sigma_psi, fixed)
+                                   velocity_assignment, sigma_psi, fixed,
+                                   gather)
     println("Post-processing...")
     @time xyz = @. xyzv[1:3,:] - Lbox / 2
     @time v = xyzv[4:6,:]
-    return xyz, v
+
+    return collect(xyz), collect(v)
 end
 
 
