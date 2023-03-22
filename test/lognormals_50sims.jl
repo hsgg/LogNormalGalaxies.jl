@@ -156,17 +156,17 @@ function agrawal_fig2()
         #f = 0
         D = 1
         nbar = 3e-4
-        L = 3e3
-        n_sim = 256
-        n_est = 256
-        nrlz = 100
-        sim_vox = 2
+        L = 1e3
+        n_sim = 512
+        n_est = 512
+        nrlz = 3
+        sim_vox = 1
         est_vox = 0
-        sim_velo = 6
+        sim_velo = 0
         grid_assignment = 1
         fxshift_sim = 0
         fxshift_est = 0
-        sigma_psi = 0
+        sigma_psi = 8.3
     end
 end
 function agrawal_fig6_fig7()
@@ -194,7 +194,7 @@ function main(fbase, rfftplanner=LogNormalGalaxies.plan_with_fftw)
 
     @eval $(agrawal_fig2())
     #@eval $(agrawal_fig6_fig7())
-    generate = true
+    generate = false
 
     #data = readdlm((@__DIR__)*"/matterpower.dat", comments=true)
     #_pk = Spline1D(data[:,1], data[:,2], extrapolation=Splines.powerlaw)
@@ -207,23 +207,32 @@ function main(fbase, rfftplanner=LogNormalGalaxies.plan_with_fftw)
     fname = make_fname("out/"*fbase; nbar, b, D, f, L, n_sim, n_est, sim_vox, est_vox, sim_velo, grid_assignment, nrlz, fxshift_est, fxshift_sim)
 
     println("Running with $(rfftplanner)...")
-    km, pkm, nmodes, pkm_err = generate_sims(pk, nbar, b, f, L, n_sim, n_est, nrlz; rfftplanner, sim_vox, est_vox, sim_velo, grid_assignment, fxshift_est, fxshift_sim, generate, sigma_psi)
-    writedlm(fname, [km pkm nmodes pkm_err])
+    if generate || !isfile(fname)
+        km, pkm, nmodes, pkm_err = generate_sims(pk, nbar, b, f, L, n_sim, n_est, nrlz; rfftplanner, sim_vox, est_vox, sim_velo, grid_assignment, fxshift_est, fxshift_sim, generate, sigma_psi)
+        writedlm(fname, [km pkm nmodes pkm_err])
+    end
     km, pkm, nmodes, pkm_err = readdlm_cols(fname, [1, 2:6, 7, 8:12])
+    pkm[1,2:end] .= 0
+    pkm_err[1,2:end] .= 0
+    @assert all(isfinite.(pkm_err))
+    @assert all(pkm_err .>= 0)
 
     # theory
     β = f / b
     #pkm_kaiser = @. b^2 * Arsd_Kaiser(β, (0:4)') * pk(km)
     pkm_kaiser = @. b^2 * Arsd_l_exp(km*f*sigma_psi, β, (0:4)') * pk(km)
+    @assert all(isfinite.(pkm_kaiser))
 
 
     #close("all")  # close previous plots to prevent plotcapolypse
 
+    n = 1
+
     # plot
     figure()
     make_title(; L, D, f, n_sim, n_est, sim_vox, est_vox, sim_velo)#, grid_assignment)
-    hlines(1/nbar, extrema(km)..., color="0.75", label="Shot noise")
-    n = 0
+    plot(km, km.^n ./ nbar, color="0.75", label="Shot noise")
+    #hlines(1/nbar, extrema(km)..., color="0.75", label="Shot noise")
     plot(km, km.^n .* b^2 .* pk.(km), "k", label="input \$k^$n P(k)\$")
     for m=1:size(pkm,2)
         errorbar(km, km.^n.*pkm[:,m], km.^n.*pkm_err[:,m], c="C$(m-1)", alpha=0.7)
@@ -234,7 +243,8 @@ function main(fbase, rfftplanner=LogNormalGalaxies.plan_with_fftw)
     xlabel(L"k")
     ylabel("\$k^$n P_\\ell(k)\$")
     xscale("log")
-    xlim(right=0.3)
+    ylim(top=1.1*maximum(km.^n.*pkm))
+    #xlim(right=0.3)
     legend(fontsize="small")
     savefig((@__DIR__)*"/$(fbase).pdf")
 
@@ -248,10 +258,9 @@ function main(fbase, rfftplanner=LogNormalGalaxies.plan_with_fftw)
     for l=[0,2]
         m = l+1
         ymid = pkm[:,m] ./ pkm_kaiser[:,m]
-        yerr = pkm_err[:,m] ./ pkm_kaiser[:,m]
-        #errorbar(km, ymid, yerr, c="C$(m-1)", alpha=0.7)
-        #errorbar(km, ymid, yerr ./ sqrt(nrlz), c="C$(m-1)", elinewidth=4, alpha=0.7)
-        errorbar(km, ymid, yerr ./ sqrt(nrlz), c="C$(m-1)", elinewidth=1, alpha=0.7)
+        yerr = @. pkm_err[:,m] / abs(pkm_kaiser[:,m])
+        errorbar(km, ymid, yerr, c="C$(m-1)", alpha=0.7)
+        errorbar(km, ymid, yerr ./ sqrt(nrlz), c="C$(m-1)", elinewidth=4, alpha=0.7)
         plot(km, ymid, "C$(m-1)-", label="\$P_{$(m-1)}(k)\$", alpha=0.7)
     end
     xlabel(L"k")

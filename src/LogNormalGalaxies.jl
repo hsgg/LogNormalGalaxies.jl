@@ -172,7 +172,7 @@ end
 
 ##################### draw galaxies ###########################
 function draw_galaxies_with_velocities(deltar, vx, vy, vz, Ngalaxies, Δx=[1.0,1.0,1.0];
-        rng=Random.GLOBAL_RNG, voxel_window_power=1, velocity_assignment=1, sigma_psi=0.0)
+        rng=Random.GLOBAL_RNG, voxel_window_power=1, velocity_assignment=1)
     T = Float64
     rsd = !(vx == vy == vz == 0)
     Navg = Ngalaxies / prod(size_global(deltar))
@@ -315,13 +315,6 @@ function draw_galaxies_with_velocities(deltar, vx, vy, vz, Ngalaxies, Δx=[1.0,1
                 end
 
             end # else xyzv[4:6] = 0
-
-            # FoG: sigma_u = f * sigma_psi
-            if sigma_psi != 0
-                xyzv[g0+4] += sigma_psi * randn()
-                xyzv[g0+5] += sigma_psi * randn()
-                xyzv[g0+6] += sigma_psi * randn()
-            end
 
             g0 += 6
         end
@@ -535,7 +528,14 @@ function simulate_galaxies(nxyz, Lxyz, Ngalaxies, pk, b, faH; rfftplan=default_p
     end
 
     println("Draw galaxies...")
-    @time xyzv = draw_galaxies_with_velocities(deltarg, vx, vy, vz, Ngalaxies, Δx; rng, voxel_window_power, velocity_assignment, sigma_psi)
+    @time xyzv = draw_galaxies_with_velocities(deltarg, vx, vy, vz, Ngalaxies, Δx; rng, voxel_window_power, velocity_assignment)
+
+    # FoG: sigma_u = f * sigma_psi
+    if sigma_psi != 0
+        @. xyzv[4,:] += sigma_psi * randn()
+        @. xyzv[5,:] += sigma_psi * randn()
+        @. xyzv[6,:] += sigma_psi * randn()
+    end
 
     if faH != 1 && faH != 0
         @time @strided @. xyzv[4:6,:] *= faH
