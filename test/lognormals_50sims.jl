@@ -59,11 +59,10 @@ function generate_sims(pk, nbar, b, f, L, n_sim, n_est, nrlzs; rfftplanner=LogNo
         x⃗ = collect(xyzv[1:3,:])
         Ψ = collect(xyzv[4:6,:])
 
-        # add RSD
         if rsd
             println("Apply RSD...")
             los = [0, 0, 1]
-            @time x⃗ .+= f * (los' * Ψ) .* los
+            apply_RSD!(x⃗, Ψ, f, los)
         end
 
         @. x⃗ += fxshift_est * LLL / nnn_est + fxshift_sim * LLL / nnn_sim

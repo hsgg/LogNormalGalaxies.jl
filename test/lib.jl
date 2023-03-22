@@ -37,8 +37,10 @@ function plot_pkl(k, pkl, pkl_err, pkl_kaiser, nbar; n=0, nrlzs=1, pk_g=nothing)
         plot(k, k.^n.*pkl_kaiser[:,m], "C$(m-1)--", alpha=0.7)
     end
     for m=1:size(pkl,2)
-        errorbar(k, k.^n.*pkl[:,m], k.^n.*pkl_err[:,m], c="C$(m-1)", alpha=0.7)
-        if nrlzs > 1
+        if !isnothing(pkl_err)
+            errorbar(k, k.^n.*pkl[:,m], k.^n.*pkl_err[:,m], c="C$(m-1)", alpha=0.7)
+        end
+        if !isnothing(pkl_err) && nrlzs > 1
             errorbar(k, k.^n.*pkl[:,m], k.^n.*pkl_err[:,m] ./ sqrt(nrlzs), c="C$(m-1)", elinewidth=4, alpha=0.7)
         end
         plot(k, k.^n.*pkl[:,m], "C$(m-1)-", label="\$k^$n P_{$(m-1)}(k)\$", alpha=0.7)
