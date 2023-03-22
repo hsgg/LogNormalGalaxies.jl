@@ -15,20 +15,10 @@ using Statistics
 using PlaneParallelRedshiftSpaceDistortions
 
 
-function Arsd_Kaiser(β, ℓ)
-    if ℓ == 0
-        return 1 + 2/3*β + 1/5*β^2
-    elseif ℓ == 2
-        return 4/3*β + 4/7*β^2
-    elseif ℓ == 4
-        return 8/35*β^2
-    else
-        return 0
-    end
-end
+include("lib.jl")
 
 
-function generate_sims(pk, nbar, b, f, L, n_sim, n_est, nrlz; rfftplanner=LogNormalGalaxies.plan_with_fftw, sim_vox=0, est_vox=0, sim_velo=1, grid_assignment=1, fxshift_est=0, fxshift_sim=0, generate=true, sigma_psi=0.0)
+function generate_sims(pk, nbar, b, f, L, n_sim, n_est, nrlzs; rfftplanner=LogNormalGalaxies.plan_with_fftw, sim_vox=0, est_vox=0, sim_velo=1, grid_assignment=1, fxshift_est=0, fxshift_sim=0, generate=true, sigma_psi=0.0)
     LLL = [L, L, L]
     nnn_sim = [n_sim, n_sim, n_sim]
     nnn_est = [n_est, n_est, n_est]
@@ -43,13 +33,13 @@ function generate_sims(pk, nbar, b, f, L, n_sim, n_est, nrlz; rfftplanner=LogNor
 
     x⃗ = fill(0.0, 3, 1)
     km, pkm, nmodes = xgals_to_pkl_planeparallel(x⃗, LLL, nnn_est, box_center; est_opts...)
-    pkm = fill(0.0, length(km), size(pkm,2), nrlz)
+    pkm = fill(0.0, length(km), size(pkm,2), nrlzs)
 
     #Random.seed!(204213467893)
-    #seeds = [rand(UInt64) for rlz=1:nrlz]
+    #seeds = [rand(UInt64) for rlz=1:nrlzs]
 
-    for rlz=1:nrlz
-        println("===== rlz = $rlz/$nrlz")
+    for rlz=1:nrlzs
+        println("===== rlz = $rlz/$nrlzs")
         #Random.seed!(seeds[1] + rlz)
         #Random.seed!(seeds[rlz])
         rsd = (f != 0)
@@ -159,7 +149,7 @@ function agrawal_fig2()
         L = 1e3
         n_sim = 512
         n_est = 512
-        nrlz = 3
+        nrlzs = 3
         sim_vox = 1
         est_vox = 0
         sim_velo = 0
@@ -178,7 +168,7 @@ function agrawal_fig6_fig7()
         L = 3e3
         n_sim = 512
         n_est = 512
-        nrlz = 100
+        nrlzs = 100
         sim_vox = 2
         est_vox = 0
         sim_velo = 1
@@ -204,11 +194,11 @@ function main(fbase, rfftplanner=LogNormalGalaxies.plan_with_fftw)
 
     pk(k) = D^2 * _pk(k)
 
-    fname = make_fname("out/"*fbase; nbar, b, D, f, L, n_sim, n_est, sim_vox, est_vox, sim_velo, grid_assignment, nrlz, fxshift_est, fxshift_sim)
+    fname = make_fname("out/"*fbase; nbar, b, D, f, L, n_sim, n_est, sim_vox, est_vox, sim_velo, grid_assignment, nrlzs, fxshift_est, fxshift_sim)
 
     println("Running with $(rfftplanner)...")
     if generate || !isfile(fname)
-        km, pkm, nmodes, pkm_err = generate_sims(pk, nbar, b, f, L, n_sim, n_est, nrlz; rfftplanner, sim_vox, est_vox, sim_velo, grid_assignment, fxshift_est, fxshift_sim, generate, sigma_psi)
+        km, pkm, nmodes, pkm_err = generate_sims(pk, nbar, b, f, L, n_sim, n_est, nrlzs; rfftplanner, sim_vox, est_vox, sim_velo, grid_assignment, fxshift_est, fxshift_sim, generate, sigma_psi)
         writedlm(fname, [km pkm nmodes pkm_err])
     end
     km, pkm, nmodes, pkm_err = readdlm_cols(fname, [1, 2:6, 7, 8:12])
@@ -217,12 +207,12 @@ function main(fbase, rfftplanner=LogNormalGalaxies.plan_with_fftw)
     @assert all(isfinite.(pkm_err))
     @assert all(pkm_err .>= 0)
 
+
     # theory
+    pk_g = @. b^2 * pk(km)
     β = f / b
     #pkm_kaiser = @. b^2 * Arsd_Kaiser(β, (0:4)') * pk(km)
-    pkm_kaiser = @. b^2 * Arsd_l_exp(km*f*sigma_psi, β, (0:4)') * pk(km)
-    @assert all(isfinite.(pkm_kaiser))
-
+    pkl_kaiser = @. b^2 * Arsd_l_exp(km*f*sigma_psi, β, (0:4)') * pk(km)
 
     #close("all")  # close previous plots to prevent plotcapolypse
 
@@ -231,44 +221,14 @@ function main(fbase, rfftplanner=LogNormalGalaxies.plan_with_fftw)
     # plot
     figure()
     make_title(; L, D, f, n_sim, n_est, sim_vox, est_vox, sim_velo)#, grid_assignment)
-    plot(km, km.^n ./ nbar, color="0.75", label="Shot noise")
-    #hlines(1/nbar, extrema(km)..., color="0.75", label="Shot noise")
-    plot(km, km.^n .* b^2 .* pk.(km), "k", label="input \$k^$n P(k)\$")
-    for m=1:size(pkm,2)
-        errorbar(km, km.^n.*pkm[:,m], km.^n.*pkm_err[:,m], c="C$(m-1)", alpha=0.7)
-        errorbar(km, km.^n.*pkm[:,m], km.^n.*pkm_err[:,m] ./ sqrt(nrlz), c="C$(m-1)", elinewidth=4, alpha=0.7)
-        plot(km, km.^n.*pkm[:,m], "C$(m-1)-", label="\$k^$n P_{$(m-1)}(k)\$", alpha=0.7)
-        plot(km, km.^n.*pkm_kaiser[:,m], "C$(m-1)--", alpha=0.7)
-    end
-    xlabel(L"k")
-    ylabel("\$k^$n P_\\ell(k)\$")
-    xscale("log")
-    ylim(top=1.1*maximum(km.^n.*pkm))
-    #xlim(right=0.3)
-    legend(fontsize="small")
+    plot_pkl(km, pkm, pkm_err, pkl_kaiser, nbar; n, nrlzs, pk_g)
     savefig((@__DIR__)*"/$(fbase).pdf")
 
     #return
 
     figure()
     make_title(; L, D, f, n_sim, n_est, sim_vox, est_vox, sim_velo, #=grid_assignment,=# xshift=fxshift_est)
-    hlines(1, extrema(km)..., color="0.8")
-    hlines([0.99,1.01], extrema(km)..., color="0.7", linestyle="--")
-    hlines([0.95,1.05], extrema(km)..., color="0.6", linestyle=":")
-    for l=[0,2]
-        m = l+1
-        ymid = pkm[:,m] ./ pkm_kaiser[:,m]
-        yerr = @. pkm_err[:,m] / abs(pkm_kaiser[:,m])
-        errorbar(km, ymid, yerr, c="C$(m-1)", alpha=0.7)
-        errorbar(km, ymid, yerr ./ sqrt(nrlz), c="C$(m-1)", elinewidth=4, alpha=0.7)
-        plot(km, ymid, "C$(m-1)-", label="\$P_{$(m-1)}(k)\$", alpha=0.7)
-    end
-    xlabel(L"k")
-    ylabel(L"\hat P^{\rm pp}_\ell(k) / P^{\rm Kaiser}_\ell(k)")
-    #xscale("log")
-    xlim(left=0, right=0.25)
-    ylim(0.9, 1.1)
-    legend(fontsize="small")
+    plot_pkl_diff(km, pkm, pkm_err, pkl_kaiser, nbar; n, nrlzs)
     savefig((@__DIR__)*"/$(fbase)_rdiff.pdf")
 end
 
