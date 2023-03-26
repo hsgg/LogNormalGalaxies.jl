@@ -1,0 +1,4 @@
+[deps]
+DelimitedFiles = "8bb1440f-4735-579b-a4ab-409b98df4dab"
+PyPlot = "d330b81b-6aea-500a-939a-2ce795aea3ee"
+Splines = "59274c38-6050-4eab-b485-1b2b36df4d3b"

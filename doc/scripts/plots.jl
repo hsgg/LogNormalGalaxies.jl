@@ -1,17 +1,21 @@
 #!/usr/bin/env julia
 
 using Revise
-using Pkg
-Pkg.activate((@__DIR__)*"/..")
 
+# load current LogNormalGalaxies version:
+using Pkg
+Pkg.activate((@__DIR__)*"/../..")
 using LogNormalGalaxies
+
+# load other dependencies:
+Pkg.activate(@__DIR__)
 using PyPlot
 using DelimitedFiles
 using Splines
 
 
 function plot_pk_pkG()
-    data = readdlm((@__DIR__)*"/../test/matterpower.dat", comments=true)
+    data = readdlm((@__DIR__)*"/../../test/matterpower.dat", comments=true)
     in_k = data[:,1]
     in_pk = data[:,2]
 
@@ -45,6 +49,7 @@ function plot_pk_pkG()
     ylabel(L"$P(k)$ in [Mpc/$h$]$^3$")
     mkpath((@__DIR__)*"/../figs/")
     savefig((@__DIR__)*"/../figs/pk_pkG")
+    println("Saved '$((@__DIR__)*"/../figs/pk_pkG.png'.")")
 end
 
 
