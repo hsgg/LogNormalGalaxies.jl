@@ -1,5 +1,8 @@
 [deps]
 DelimitedFiles = "8bb1440f-4735-579b-a4ab-409b98df4dab"
+MeasurePowerSpectra = "74159778-d4a3-4c31-b0f7-baeaee79979b"
 PlaneParallelRedshiftSpaceDistortions = "69942907-cdcb-4e72-88f5-c4156138b8a7"
 PyPlot = "d330b81b-6aea-500a-939a-2ce795aea3ee"
+Revise = "295af30f-e4ad-537b-8983-00126c2a3abe"
 Splines = "59274c38-6050-4eab-b485-1b2b36df4d3b"
+YAML = "ddb6d928-2868-570f-bddf-ab3f9cf99eb6"

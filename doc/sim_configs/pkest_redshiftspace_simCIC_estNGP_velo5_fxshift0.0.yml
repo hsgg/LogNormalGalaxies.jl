@@ -6,7 +6,7 @@ bias: 1.455  # same as Agrawal+2017
 D: 1.0       # already included in power spectrum
 nbar: 3e-5   # non need to change between sims
 L: 3e3       # let's keep it constant
-nrlzs: 3     # can be the same for all
+nrlzs: 100   # can be the same for all
 
 n_sim: 320
 n_est: 320
