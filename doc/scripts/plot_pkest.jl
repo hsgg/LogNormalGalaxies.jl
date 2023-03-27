@@ -1,11 +1,11 @@
 #!/usr/bin/env julia
 
 using Revise
-
-# load current LogNormalGalaxies version:
 using Pkg
-Pkg.activate((@__DIR__)*"/../..")
-using LogNormalGalaxies
+
+## load current LogNormalGalaxies version:
+#Pkg.activate((@__DIR__)*"/../..")
+#using LogNormalGalaxies
 
 # load other dependencies:
 Pkg.activate(@__DIR__)
@@ -168,9 +168,9 @@ function plot_pkest(args)
 
     figure()
     make_title(; L, D, f, n_sim, n_est, sim_vox, est_vox, sim_velo, #=grid_assignment,=# xshift=fxshift_sim)
-    plot_pkl_diff(km, pkm, pkm_err, pkl_kaiser, nbar; n, nrlzs)
-    plot(km, Wmesh_sim.^7)
-    plot(km, Wmesh_est.^6)
+    plot_pkl_diff(km, pkm ./ Wmesh_est .^ 6, pkm_err, pkl_kaiser, nbar; n, nrlzs)
+    #plot(km, Wmesh_sim.^7)
+    #plot(km, Wmesh_est.^6)
     tight_layout()
     savefig(outfname2)
 end

@@ -146,16 +146,16 @@ function agrawal_fig2()
         D = 1
         nbar = 3e-4
         L = 1e3
-        n_sim = 512
-        n_est = 512
-        nrlzs = 3
-        sim_vox = 1
+        n_sim = 320
+        n_est = 320
+        nrlzs = 1000
+        sim_vox = 2
         est_vox = 0
-        sim_velo = 0
+        sim_velo = 1
         grid_assignment = 1
         fxshift_sim = 0
         fxshift_est = 0
-        sigma_psi = 8.3
+        sigma_psi = 0
     end
 end
 function agrawal_fig6_fig7()
@@ -193,7 +193,7 @@ function main(fbase, rfftplanner=LogNormalGalaxies.plan_with_fftw)
 
     pk(k) = D^2 * _pk(k)
 
-    fname = make_fname("out/"*fbase; nbar, b, D, f, L, n_sim, n_est, sim_vox, est_vox, sim_velo, grid_assignment, nrlzs, fxshift_est, fxshift_sim)
+    fname = make_fname("out/"*fbase; nbar, b, D, f, L, n_sim, n_est, sim_vox, est_vox, sim_velo, grid_assignment, nrlzs, fxshift_est, fxshift_sim, sigma_psi)
 
     println("Running with $(rfftplanner)...")
     if generate || !isfile(fname)
@@ -213,9 +213,12 @@ function main(fbase, rfftplanner=LogNormalGalaxies.plan_with_fftw)
     #pkm_kaiser = @. b^2 * Arsd_Kaiser(β, (0:4)') * pk(km)
     pkl_kaiser = @. b^2 * Arsd_l_exp(km*f*sigma_psi, β, (0:4)') * pk(km)
 
-    #close("all")  # close previous plots to prevent plotcapolypse
 
     n = 1
+    Δx_sim = L / n_sim
+    Δx_est = L / n_est
+    Wmesh_sim = @. sinc(km * Δx_sim / (2 * π))
+    Wmesh_est = @. sinc(km * Δx_est / (2 * π))
 
     # plot
     figure()
@@ -223,11 +226,11 @@ function main(fbase, rfftplanner=LogNormalGalaxies.plan_with_fftw)
     plot_pkl(km, pkm, pkm_err, pkl_kaiser, nbar; n, nrlzs, pk_g)
     savefig((@__DIR__)*"/$(fbase).pdf")
 
-    #return
-
     figure()
     make_title(; L, D, f, n_sim, n_est, sim_vox, est_vox, sim_velo, #=grid_assignment,=# xshift=fxshift_est)
     plot_pkl_diff(km, pkm, pkm_err, pkl_kaiser, nbar; n, nrlzs)
+    plot(km, Wmesh_sim.^7)
+    plot(km, Wmesh_est.^6)
     savefig((@__DIR__)*"/$(fbase)_rdiff.pdf")
 end
 
