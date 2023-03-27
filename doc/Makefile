@@ -5,6 +5,19 @@ FIGS = figs/pk_pkG.pdf \
        figs/pkest_realspace_simNGP_estNGP_fxshift0.5_pkest.pdf \
        figs/pkest_realspace_simCIC_estNGP_fxshift0.0_pkest.pdf \
        figs/pkest_realspace_simCIC_estNGP_fxshift0.5_pkest.pdf \
+       \
+       figs/pkest_redshiftspace_simCIC_estNGP_velo1_fxshift0.0_pkest.pdf \
+       figs/pkest_redshiftspace_simCIC_estNGP_velo1_fxshift0.5_pkest.pdf \
+       figs/pkest_redshiftspace_simCIC_estNGP_velo2_fxshift0.0_pkest.pdf \
+       figs/pkest_redshiftspace_simCIC_estNGP_velo2_fxshift0.5_pkest.pdf \
+       figs/pkest_redshiftspace_simCIC_estNGP_velo3_fxshift0.0_pkest.pdf \
+       figs/pkest_redshiftspace_simCIC_estNGP_velo3_fxshift0.5_pkest.pdf \
+       figs/pkest_redshiftspace_simCIC_estNGP_velo4_fxshift0.0_pkest.pdf \
+       figs/pkest_redshiftspace_simCIC_estNGP_velo4_fxshift0.5_pkest.pdf \
+       figs/pkest_redshiftspace_simCIC_estNGP_velo5_fxshift0.0_pkest.pdf \
+       figs/pkest_redshiftspace_simCIC_estNGP_velo5_fxshift0.5_pkest.pdf \
+       figs/pkest_redshiftspace_simCIC_estNGP_velo6_fxshift0.0_pkest.pdf \
+       figs/pkest_redshiftspace_simCIC_estNGP_velo6_fxshift0.5_pkest.pdf \
 
 
 tex/lognormal.pdf: tex/lognormal.tex references.bib $(FIGS)
