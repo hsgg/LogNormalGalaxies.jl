@@ -1,3 +1,6 @@
+# Causes make to retain all intermediate files, as long as the recipe succeeded:
+.SECONDARY:
+
 all: tex/lognormal.pdf
 
 FIGS = figs/pk_pkG.pdf \
