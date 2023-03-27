@@ -3,11 +3,6 @@
 using Revise
 using Pkg
 
-## load current LogNormalGalaxies version:
-#Pkg.activate((@__DIR__)*"/../..")
-#using LogNormalGalaxies
-
-# load other dependencies:
 Pkg.activate(@__DIR__)
 using PyPlot
 using DelimitedFiles
@@ -63,7 +58,6 @@ function plot_pkl_diff(k, pkl, pkl_err, pkl_kaiser, nbar; n=0, nrlzs=1)
     #xscale("log")
     xlim(left=0, right=0.25)
     ylim(0.9, 1.1)
-    legend(fontsize="small")
 end
 
 
@@ -157,6 +151,11 @@ function plot_pkest(args)
     Δx_est = L / n_est
     Wmesh_sim = @. sinc(km * Δx_sim / (2 * π))
     Wmesh_est = @. sinc(km * Δx_est / (2 * π))
+    if est_grid_assignment == 2
+        est_grid_assignment = 6
+    end
+    p = sim_vox + est_grid_assignment - est_vox
+    @show sim_vox,est_grid_assignment,p
 
     # plot
     figure()
@@ -168,13 +167,13 @@ function plot_pkest(args)
 
     figure()
     make_title(; L, D, f, n_sim, n_est, sim_vox, est_vox, sim_velo, #=grid_assignment,=# xshift=fxshift_sim)
-    plot_pkl_diff(km, pkm ./ Wmesh_est .^ 6, pkm_err, pkl_kaiser, nbar; n, nrlzs)
-    #plot(km, Wmesh_sim.^7)
-    #plot(km, Wmesh_est.^6)
+    plot_pkl_diff(km, pkm ./ Wmesh_est .^ (2*p), pkm_err, pkl_kaiser, nbar; n, nrlzs)
+    plot(km, Wmesh_est.^(6-2*p), label="p=3")
+    plot(km, Wmesh_sim.^(2*p-2*p), label="p=$p")
+    legend(fontsize="small")
     tight_layout()
     savefig(outfname2)
 end
 
-@show ARGS
 
 plot_pkest(ARGS)

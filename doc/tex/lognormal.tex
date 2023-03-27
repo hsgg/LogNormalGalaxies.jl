@@ -842,72 +842,91 @@ S_p(x - x_i)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsection{Assignment results}
-%%%%%%%%%
+%%%%%%%%%%%%%%%%%%% Realspace %%%%%%%%%%%%%%%%%
 \begin{figure*}
   \centering
-  \incgraph{../figs/pkest_realspace_simNGP_estNGP_fxshift0.0_pkest.pdf}
-  \incgraph{../figs/pkest_realspace_simNGP_estNGP_fxshift0.0_pkest_rdiff.pdf}
-  \incgraph{../figs/pkest_realspace_simNGP_estNGP_fxshift0.5_pkest.pdf}
-  \incgraph{../figs/pkest_realspace_simNGP_estNGP_fxshift0.5_pkest_rdiff.pdf}
-  \caption{Real space, NGP assignments.}
+  \incgraph{../figs/pkest_realspace_nmesh256_simNGP_estNGP_fxshift0.0_pkest_rdiff.pdf}
+  \incgraph{../figs/pkest_realspace_nmesh256_simNGP_estNGP_fxshift0.5_pkest_rdiff.pdf}
+  \incgraph{../figs/pkest_realspace_nmesh512_simNGP_estNGP_fxshift0.0_pkest_rdiff.pdf}
+  \incgraph{../figs/pkest_realspace_nmesh512_simNGP_estNGP_fxshift0.5_pkest_rdiff.pdf}
+  \caption{Real space, sim:NGP, est:NGP. Top: Nmesh=256. Bottom: Nmesh=512}
   \label{fig:grid_assignment_realspace}
 \end{figure*}
 %%%%%%%%%
 \begin{figure*}
   \centering
-  \incgraph{../figs/pkest_realspace_simCIC_estNGP_fxshift0.0_pkest.pdf}
-  \incgraph{../figs/pkest_realspace_simCIC_estNGP_fxshift0.0_pkest_rdiff.pdf}
-  \incgraph{../figs/pkest_realspace_simCIC_estNGP_fxshift0.5_pkest.pdf}
-  \incgraph{../figs/pkest_realspace_simCIC_estNGP_fxshift0.5_pkest_rdiff.pdf}
-  \caption{Real space, CIC assignments for simulator, NGP for estimator.}
+  %\incgraph{../figs/pkest_realspace_simCIC_estNGP_fxshift0.0_pkest.pdf}
+  %\incgraph{../figs/pkest_realspace_simCIC_estNGP_fxshift0.5_pkest.pdf}
+  \incgraph{../figs/pkest_realspace_nmesh256_simCIC_estNGP_fxshift0.0_pkest_rdiff.pdf}
+  \incgraph{../figs/pkest_realspace_nmesh256_simCIC_estNGP_fxshift0.5_pkest_rdiff.pdf}
+  \incgraph{../figs/pkest_realspace_nmesh512_simCIC_estNGP_fxshift0.0_pkest_rdiff.pdf}
+  \incgraph{../figs/pkest_realspace_nmesh512_simCIC_estNGP_fxshift0.5_pkest_rdiff.pdf}
+  \caption{Real space, sim:CIC, est:NGP. Top: Nmesh=256. Bottom: Nmesh=512.}
   \label{fig:grid_assignment_realspace_CIC}
 \end{figure*}
 %%%%%%%%%
 \begin{figure*}
   \centering
-  \incgraph{../figs/pkest_redshiftspace_simCIC_estNGP_velo1_fxshift0.0_pkest.pdf}
-  \incgraph{../figs/pkest_redshiftspace_simCIC_estNGP_velo1_fxshift0.0_pkest_rdiff.pdf}
-  \caption{Redshift space, CIC assignments for simulator, NGP for estimator, velocity 1.}
+  %\incgraph{../figs/pkest_realspace_simCIC_estNGP_fxshift0.0_pkest.pdf}
+  %\incgraph{../figs/pkest_realspace_simCIC_estNGP_fxshift0.5_pkest.pdf}
+  \incgraph{../figs/pkest_realspace_nmesh256_simNGP_estCIC_fxshift0.0_pkest_rdiff.pdf}
+  \incgraph{../figs/pkest_realspace_nmesh256_simNGP_estCIC_fxshift0.5_pkest_rdiff.pdf}
+  \incgraph{../figs/pkest_realspace_nmesh256_simCIC_estCIC_fxshift0.0_pkest_rdiff.pdf}
+  \incgraph{../figs/pkest_realspace_nmesh256_simCIC_estCIC_fxshift0.5_pkest_rdiff.pdf}
+  \caption{Real space, Top: sim:NGP est:CIC. Bottom: sim:CIC est:CIC. Nmesh=256.}
+  \label{fig:grid_assignment_realspace_CIC_NGP}
+\end{figure*}
+%%%%%%%%%
+%%%%%%%%%%%%%%%%%%% Redshift space %%%%%%%%%%%%%%%%%
+\begin{figure*}
+  \centering
+  \incgraph{../figs/pkest_redshiftspace_nmesh256_simCIC_estNGP_velo1_fxshift0.0_pkest_rdiff.pdf}
+  \incgraph{../figs/pkest_redshiftspace_nmesh256_simCIC_estNGP_velo1_fxshift0.5_pkest_rdiff.pdf}
+  \caption{Redshift space, sim:CIC, est:NGP, velocity 1.}
   \label{fig:grid_assignment_redshiftspace_CIC_velo1}
 \end{figure*}
 %%%%%%%%%
 \begin{figure*}
   \centering
-  \incgraph{../figs/pkest_redshiftspace_simCIC_estNGP_velo2_fxshift0.0_pkest.pdf}
-  \incgraph{../figs/pkest_redshiftspace_simCIC_estNGP_velo2_fxshift0.0_pkest_rdiff.pdf}
-  \caption{Redshift space, CIC assignments for simulator, NGP for estimator, velocity 2.}
+  \incgraph{../figs/pkest_redshiftspace_nmesh256_simCIC_estNGP_velo2_fxshift0.0_pkest_rdiff.pdf}
+  \incgraph{../figs/pkest_redshiftspace_nmesh256_simCIC_estNGP_velo2_fxshift0.5_pkest_rdiff.pdf}
+  \caption{Redshift space, sim:CIC, est:NGP, velocity 2.}
   \label{fig:grid_assignment_redshiftspace_CIC_velo2}
 \end{figure*}
 %%%%%%%%%
 \begin{figure*}
   \centering
-  \incgraph{../figs/pkest_redshiftspace_simCIC_estNGP_velo3_fxshift0.0_pkest.pdf}
-  \incgraph{../figs/pkest_redshiftspace_simCIC_estNGP_velo3_fxshift0.0_pkest_rdiff.pdf}
-  \caption{Redshift space, CIC assignments for simulator, NGP for estimator, velocity 3.}
+  \incgraph{../figs/pkest_redshiftspace_nmesh256_simCIC_estNGP_velo3_fxshift0.0_pkest_rdiff.pdf}
+  \incgraph{../figs/pkest_redshiftspace_nmesh256_simCIC_estNGP_velo3_fxshift0.5_pkest_rdiff.pdf}
+  \caption{Redshift space, sim:CIC, est:NGP, velocity 3.}
   \label{fig:grid_assignment_redshiftspace_CIC_velo3}
 \end{figure*}
 %%%%%%%%%
 \begin{figure*}
   \centering
-  \incgraph{../figs/pkest_redshiftspace_simCIC_estNGP_velo4_fxshift0.0_pkest.pdf}
-  \incgraph{../figs/pkest_redshiftspace_simCIC_estNGP_velo4_fxshift0.0_pkest_rdiff.pdf}
-  \caption{Redshift space, CIC assignments for simulator, NGP for estimator, velocity 4.}
+  \incgraph{../figs/pkest_redshiftspace_nmesh256_simCIC_estNGP_velo4_fxshift0.0_pkest_rdiff.pdf}
+  \incgraph{../figs/pkest_redshiftspace_nmesh256_simCIC_estNGP_velo4_fxshift0.5_pkest_rdiff.pdf}
+  \caption{Redshift space, sim:CIC, est:NGP, velocity 4.}
   \label{fig:grid_assignment_redshiftspace_CIC_velo4}
 \end{figure*}
 %%%%%%%%%
 \begin{figure*}
   \centering
-  \incgraph{../figs/pkest_redshiftspace_simCIC_estNGP_velo5_fxshift0.0_pkest.pdf}
-  \incgraph{../figs/pkest_redshiftspace_simCIC_estNGP_velo5_fxshift0.0_pkest_rdiff.pdf}
-  \caption{Redshift space, CIC assignments for simulator, NGP for estimator, velocity 5.}
+  \incgraph{../figs/pkest_redshiftspace_nmesh256_simCIC_estNGP_velo5_fxshift0.0_pkest_rdiff.pdf}
+  \incgraph{../figs/pkest_redshiftspace_nmesh256_simCIC_estNGP_velo5_fxshift0.5_pkest_rdiff.pdf}
+  \incgraph{../figs/pkest_redshiftspace_nmesh512_simCIC_estNGP_velo5_fxshift0.0_pkest_rdiff.pdf}
+  \incgraph{../figs/pkest_redshiftspace_nmesh512_simCIC_estNGP_velo5_fxshift0.5_pkest_rdiff.pdf}
+  \caption{Redshift space, sim:CIC, est:NGP, velocity 5.}
   \label{fig:grid_assignment_redshiftspace_CIC_velo5}
 \end{figure*}
 %%%%%%%%%
 \begin{figure*}
   \centering
-  \incgraph{../figs/pkest_redshiftspace_simCIC_estNGP_velo6_fxshift0.0_pkest.pdf}
-  \incgraph{../figs/pkest_redshiftspace_simCIC_estNGP_velo6_fxshift0.0_pkest_rdiff.pdf}
-  \caption{Redshift space, CIC assignments for simulator, NGP for estimator, velocity 6.}
+  \incgraph{../figs/pkest_redshiftspace_nmesh256_simCIC_estNGP_velo6_fxshift0.0_pkest_rdiff.pdf}
+  \incgraph{../figs/pkest_redshiftspace_nmesh256_simCIC_estNGP_velo6_fxshift0.5_pkest_rdiff.pdf}
+  \incgraph{../figs/pkest_redshiftspace_nmesh512_simCIC_estNGP_velo6_fxshift0.0_pkest_rdiff.pdf}
+  \incgraph{../figs/pkest_redshiftspace_nmesh512_simCIC_estNGP_velo6_fxshift0.5_pkest_rdiff.pdf}
+  \caption{Redshift space, sim:CIC, est:NGP, velocity 6.}
   \label{fig:grid_assignment_redshiftspace_CIC_velo6}
 \end{figure*}
 %%%%%%%%%
