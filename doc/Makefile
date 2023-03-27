@@ -1,7 +1,20 @@
 all: tex/lognormal.pdf
 
-tex/lognormal.pdf: tex/lognormal.tex references.bib figs/*
+FIGS = figs/pk_pkG.pdf \
+       figs/pkest_realspace_simNGP_estNGP_fxshift0.0_pkest.pdf \
+       figs/pkest_realspace_simNGP_estNGP_fxshift0.5_pkest.pdf \
+       figs/pkest_realspace_simCIC_estNGP_fxshift0.0_pkest.pdf \
+       figs/pkest_realspace_simCIC_estNGP_fxshift0.5_pkest.pdf \
+
+
+tex/lognormal.pdf: tex/lognormal.tex references.bib $(FIGS)
 	latexmk -cd -pdf -interaction=nonstopmode $<
 
-figs/pk_pkG.png: scripts/plots.jl
+figs/pk_pkG.pdf: scripts/plot_pk_pkG.jl
 	./$<
+
+figs/%_pkest.pdf: sim_configs/%.yml sim_results/%_pkest.tsv scripts/plot_pkest.jl
+	./scripts/plot_pkest.jl $<
+
+sim_results/%_pkest.tsv: sim_configs/%.yml scripts/calc_sims.jl
+	./scripts/calc_sims.jl $<

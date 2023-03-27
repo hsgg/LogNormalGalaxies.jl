@@ -15,14 +15,9 @@ using Splines
 
 
 function plot_pk_pkG()
-    data = readdlm((@__DIR__)*"/../../test/matterpower.dat", comments=true)
-    in_k = data[:,1]
-    in_pk = data[:,2]
-
-    #in_k = readdlm(homedir() * "/MeasurePowerSpectra.jl/inputs/kh_camb_z_eff=0.38.csv")[:]
-    #in_pk = readdlm(homedir() * "/MeasurePowerSpectra.jl/inputs/matter_power_spectrum_pk_camb_z_eff=0.38.csv")[:]
-
-    pkfn = Spline1D(in_k, in_pk, extrapolation=Splines.powerlaw)
+    #data = readdlm((@__DIR__)*"/../../test/matterpower.dat", comments=true)
+    data = readdlm((@__DIR__)*"/../../test/matterpower_zeff=0.38.dat", comments=true)
+    pkfn = Spline1D(data[:,1], data[:,2], extrapolation=Splines.powerlaw)
 
     k = 10.0 .^ (-4:0.01:0)
     #DD = [0.1, 0.2, 0.4, 0.8]
@@ -48,8 +43,8 @@ function plot_pk_pkG()
     xlabel(L"$k$ in [$h$/Mpc]")
     ylabel(L"$P(k)$ in [Mpc/$h$]$^3$")
     mkpath((@__DIR__)*"/../figs/")
-    savefig((@__DIR__)*"/../figs/pk_pkG")
-    println("Saved '$((@__DIR__)*"/../figs/pk_pkG.png'.")")
+    savefig((@__DIR__)*"/../figs/pk_pkG.pdf")
+    println("Saved '$((@__DIR__)*"/../figs/pk_pkG.pdf'.")")
 end
 
 
