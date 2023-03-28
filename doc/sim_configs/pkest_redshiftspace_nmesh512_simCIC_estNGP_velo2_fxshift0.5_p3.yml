@@ -1,0 +1,22 @@
+randomseed: "[0x659827fbbc75b78b, 0xe5aa8abfea05b963, 0x05caadbdc25751c9, 0xea636b29b0cfc8fb]"
+
+pkfname: "./../../test/matterpower_zeff=0.38.dat"
+
+bias: 1.455  # same as Agrawal+2017
+D: 1.0       # already included in power spectrum
+nbar: 3e-5   # non need to change between sims
+L: 3e3       # let's keep it constant
+nrlzs: 100  # can be the same for all
+
+n_sim: 512
+n_est: 512
+
+f: 0.71
+sigma_psi: 0.0
+
+sim_vox: 2
+sim_velo: 2
+est_vox: 3
+est_grid_assignment: 1
+fxshift_sim: 0.5
+fxshift_est: 0.0

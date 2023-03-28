@@ -60,11 +60,9 @@ for nmesh in [256, 512]
             maybewrite(fname, s)
 
             # corrected
-            if sim_vox==2 && est_grid_assignment==1
-                s = replace(s, r"est_vox: .*" => "est_vox: 3")
-                fname = replace(fname, r".yml" => "_p3.yml")
-                maybewrite(fname, s)
-            end
+            s = replace(s, r"est_vox: .*" => "est_vox: 3")
+            fname = replace(fname, r".yml" => "_p3.yml")
+            maybewrite(fname, s)
         end
     end
 
@@ -86,11 +84,9 @@ for nmesh in [256, 512]
             maybewrite(fname, s)
 
             # corrected
-            if sim_velo in [5,6]
-                s = replace(s, r"est_vox: .*" => "est_vox: 3")
-                fname = replace(fname, r".yml" => "_p3.yml")
-                maybewrite(fname, s)
-            end
+            s = replace(s, r"est_vox: .*" => "est_vox: 3")
+            fname = replace(fname, r".yml" => "_p3.yml")
+            maybewrite(fname, s)
         end
     end
 
