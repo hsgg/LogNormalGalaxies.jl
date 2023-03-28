@@ -72,39 +72,47 @@ function readdlm_cols(fname, cols)
 end
 
 
-function abbreviate(input)
-    output = []
-    for v in input
-        if string(v) == "n_sim"
-            v = "\$n_s\$"
-        elseif string(v) == "n_est"
-            v = "\$n_e\$"
-        elseif string(v) == "sim_vox"
-            v = "\$v_s\$"
-        elseif string(v) == "est_vox"
-            v = "\$v_e\$"
-        elseif string(v) == "sim_velo"
-            v = "\$vel_s\$"
-        elseif string(v) == "grid_assignment"
-            v = "\$g_e\$"
-        end
-        push!(output, v)
+function abbreviate(v)
+    if string(v) == "n_sim"
+        v = "\$n_s\$"
+    elseif string(v) == "n_est"
+        v = "\$n_e\$"
+    elseif string(v) == "sim_vox"
+        v = "\$v_s\$"
+    elseif string(v) == "est_vox"
+        v = "\$v_e\$"
+    elseif string(v) == "sim_velo"
+        v = "\$vel_s\$"
+    elseif string(v) == "grid_assignment"
+        v = "\$g_e\$"
     end
-    return output
+    return v
 end
 
 
+#function make_title(; kwargs...)
+#    t = join(abbreviate.(keys(kwargs)), ", ")
+#    t *= " = "
+#    t *= join(values(kwargs), ", ")
+#    title(t)
+#end
+
+
 function make_title(; kwargs...)
-    t = join(abbreviate(keys(kwargs)), ", ")
-    t *= " = "
-    t *= join(values(kwargs), ", ")
+    t = ""
+    s = ""
+    for (k,v) in kwargs
+        k = abbreviate(k)
+        t *= "$s$k=$v"
+        s = ", "
+    end
     title(t)
 end
 
 
-function plot_pkest(args)
-    cfg_fbase = splitext(args[1])[1]
-    cfg = YAML.load_file(cfg_fbase * ".yml")
+function plot_pkest(cfg_fname)
+    cfg_fbase = splitext(cfg_fname)[1]
+    cfg = YAML.load_file(cfg_fname)
     infname = (@__DIR__)*"/../sim_results/"*basename(cfg_fbase)*"_pkest.tsv"
     outfname1 = (@__DIR__)*"/../figs/"*basename(cfg_fbase)*"_pkest.pdf"
     outfname2 = (@__DIR__)*"/../figs/"*basename(cfg_fbase)*"_pkest_rdiff.pdf"
@@ -159,21 +167,23 @@ function plot_pkest(args)
 
     # plot
     figure()
-    make_title(; L, D, f, n_sim, n_est, sim_vox, est_vox, sim_velo)#, grid_assignment)
+    make_title(; L, f, n_sim, n_est, sim_vox, est_vox, sim_velo)#, grid_assignment)
     plot_pkl(km, pkm, pkm_err, pkl_kaiser, nbar; n, nrlzs, pk_g)
     tight_layout()
     println(outfname1)
     savefig(outfname1)
 
     figure()
-    make_title(; L, D, f, n_sim, n_est, sim_vox, est_vox, sim_velo, #=grid_assignment,=# xshift=fxshift_sim)
-    plot_pkl_diff(km, pkm ./ Wmesh_est .^ (2*p), pkm_err, pkl_kaiser, nbar; n, nrlzs)
-    plot(km, Wmesh_est.^(6-2*p), label="p=3")
-    plot(km, Wmesh_sim.^(2*p-2*p), label="p=$p")
+    make_title(; L, f, n_sim, n_est, sim_vox, est_vox, sim_velo, #=grid_assignment,=# xshift=fxshift_sim)
+    plot_pkl_diff(km, pkm ./ Wmesh_est .^ (0*2*p), pkm_err, pkl_kaiser, nbar; n, nrlzs)
+    plot(km, Wmesh_est.^(6-0*2*p), label="p=3 (\$W_e\$)")
+    plot(km, Wmesh_sim.^(2*p-0*2*p), label="p=$p (\$W_s\$)")
     legend(fontsize="small")
     tight_layout()
     savefig(outfname2)
 end
 
 
-plot_pkest(ARGS)
+for cfg_fname in ARGS
+    plot_pkest(cfg_fname)
+end

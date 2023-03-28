@@ -58,6 +58,13 @@ for nmesh in [256, 512]
             est_assign = est_grid_assignment == 1 ? "NGP" : "CIC"
             fname = dname * "/pkest_realspace_nmesh$(nmesh)_sim$(sim_assign)_est$(est_assign)_fxshift$(fxshift_sim).yml"
             maybewrite(fname, s)
+
+            # corrected
+            if sim_vox==2 && est_grid_assignment==1
+                s = replace(s, r"est_vox: .*" => "est_vox: 3")
+                fname = replace(fname, r".yml" => "_p3.yml")
+                maybewrite(fname, s)
+            end
         end
     end
 
@@ -77,6 +84,13 @@ for nmesh in [256, 512]
 
             fname = dname * "/pkest_redshiftspace_nmesh$(nmesh)_simCIC_estNGP_velo$(sim_velo)_fxshift$(fxshift_sim).yml"
             maybewrite(fname, s)
+
+            # corrected
+            if sim_velo in [5,6]
+                s = replace(s, r"est_vox: .*" => "est_vox: 3")
+                fname = replace(fname, r".yml" => "_p3.yml")
+                maybewrite(fname, s)
+            end
         end
     end
 

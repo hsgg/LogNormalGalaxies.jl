@@ -22,6 +22,11 @@ FIGS = figs/pk_pkG.pdf \
        figs/pkest_realspace_nmesh512_simCIC_estCIC_fxshift0.0_pkest.pdf \
        figs/pkest_realspace_nmesh512_simCIC_estCIC_fxshift0.5_pkest.pdf \
        \
+       figs/pkest_realspace_nmesh256_simCIC_estNGP_fxshift0.0_p3_pkest.pdf \
+       figs/pkest_realspace_nmesh256_simCIC_estNGP_fxshift0.5_p3_pkest.pdf \
+       figs/pkest_realspace_nmesh512_simCIC_estNGP_fxshift0.0_p3_pkest.pdf \
+       figs/pkest_realspace_nmesh512_simCIC_estNGP_fxshift0.5_p3_pkest.pdf \
+       \
        figs/pkest_redshiftspace_nmesh256_simCIC_estNGP_velo1_fxshift0.0_pkest.pdf \
        figs/pkest_redshiftspace_nmesh256_simCIC_estNGP_velo1_fxshift0.5_pkest.pdf \
        figs/pkest_redshiftspace_nmesh256_simCIC_estNGP_velo2_fxshift0.0_pkest.pdf \
@@ -35,10 +40,20 @@ FIGS = figs/pk_pkG.pdf \
        figs/pkest_redshiftspace_nmesh256_simCIC_estNGP_velo6_fxshift0.0_pkest.pdf \
        figs/pkest_redshiftspace_nmesh256_simCIC_estNGP_velo6_fxshift0.5_pkest.pdf \
        \
+       figs/pkest_redshiftspace_nmesh256_simCIC_estNGP_velo5_fxshift0.0_p3_pkest.pdf \
+       figs/pkest_redshiftspace_nmesh256_simCIC_estNGP_velo5_fxshift0.5_p3_pkest.pdf \
+       figs/pkest_redshiftspace_nmesh256_simCIC_estNGP_velo6_fxshift0.0_p3_pkest.pdf \
+       figs/pkest_redshiftspace_nmesh256_simCIC_estNGP_velo6_fxshift0.5_p3_pkest.pdf \
+       \
        figs/pkest_redshiftspace_nmesh512_simCIC_estNGP_velo5_fxshift0.0_pkest.pdf \
        figs/pkest_redshiftspace_nmesh512_simCIC_estNGP_velo5_fxshift0.5_pkest.pdf \
        figs/pkest_redshiftspace_nmesh512_simCIC_estNGP_velo6_fxshift0.0_pkest.pdf \
        figs/pkest_redshiftspace_nmesh512_simCIC_estNGP_velo6_fxshift0.5_pkest.pdf \
+       \
+       figs/pkest_redshiftspace_nmesh512_simCIC_estNGP_velo5_fxshift0.0_p3_pkest.pdf \
+       figs/pkest_redshiftspace_nmesh512_simCIC_estNGP_velo5_fxshift0.5_p3_pkest.pdf \
+       figs/pkest_redshiftspace_nmesh512_simCIC_estNGP_velo6_fxshift0.0_p3_pkest.pdf \
+       figs/pkest_redshiftspace_nmesh512_simCIC_estNGP_velo6_fxshift0.5_p3_pkest.pdf \
 
 
 tex/lognormal.pdf: tex/lognormal.tex references.bib $(FIGS)
