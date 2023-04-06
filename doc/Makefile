@@ -40,6 +40,14 @@ FIGS = figs/pk_pkG.pdf \
        figs/pkest_redshiftspace_nmesh256_simCIC_estNGP_velo6_fxshift0.0_pkest.pdf \
        figs/pkest_redshiftspace_nmesh256_simCIC_estNGP_velo6_fxshift0.5_pkest.pdf \
        \
+       figs/pkest_redshiftspace_nmesh256_simCIC_estNGP_velo1_fxshift0.0_p3_pkest.pdf \
+       figs/pkest_redshiftspace_nmesh256_simCIC_estNGP_velo1_fxshift0.5_p3_pkest.pdf \
+       figs/pkest_redshiftspace_nmesh256_simCIC_estNGP_velo2_fxshift0.0_p3_pkest.pdf \
+       figs/pkest_redshiftspace_nmesh256_simCIC_estNGP_velo2_fxshift0.5_p3_pkest.pdf \
+       figs/pkest_redshiftspace_nmesh256_simCIC_estNGP_velo3_fxshift0.0_p3_pkest.pdf \
+       figs/pkest_redshiftspace_nmesh256_simCIC_estNGP_velo3_fxshift0.5_p3_pkest.pdf \
+       figs/pkest_redshiftspace_nmesh256_simCIC_estNGP_velo4_fxshift0.0_p3_pkest.pdf \
+       figs/pkest_redshiftspace_nmesh256_simCIC_estNGP_velo4_fxshift0.5_p3_pkest.pdf \
        figs/pkest_redshiftspace_nmesh256_simCIC_estNGP_velo5_fxshift0.0_p3_pkest.pdf \
        figs/pkest_redshiftspace_nmesh256_simCIC_estNGP_velo5_fxshift0.5_p3_pkest.pdf \
        figs/pkest_redshiftspace_nmesh256_simCIC_estNGP_velo6_fxshift0.0_p3_pkest.pdf \
