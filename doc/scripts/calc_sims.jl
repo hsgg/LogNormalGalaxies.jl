@@ -1,14 +1,8 @@
 #!/usr/bin/env julia
 
-using Revise
-
-# load current LogNormalGalaxies version:
 using Pkg
-Pkg.activate((@__DIR__)*"/../..")
-using LogNormalGalaxies
-
-# load other dependencies:
 Pkg.activate(@__DIR__)
+using Revise
 using DelimitedFiles
 using Random
 using Statistics
@@ -16,7 +10,9 @@ using Splines
 using MeasurePowerSpectra
 using YAML
 
-include("lib.jl")
+# load current LogNormalGalaxies version:
+include("../../src/LogNormalGalaxies.jl")
+using .LogNormalGalaxies
 
 
 function apply_RSD!(x⃗, Ψ, f, los)

@@ -1,9 +1,8 @@
 #!/usr/bin/env julia
 
-using Revise
 using Pkg
-
 Pkg.activate(@__DIR__)
+using Revise
 using PyPlot
 using DelimitedFiles
 using Splines
@@ -171,7 +170,7 @@ function plot_pkest(cfg_fname)
     plot_pkl(km, pkm, pkm_err, pkl_kaiser, nbar; n, nrlzs, pk_g)
     tight_layout()
     println(outfname1)
-    savefig(outfname1)
+    savefig(outfname1, metadata=Dict("CreationDate"=>nothing))
 
     figure()
     make_title(; L, f, n_sim, n_est, sim_vox, est_vox, sim_velo, #=grid_assignment,=# xshift=fxshift_sim)
@@ -180,7 +179,7 @@ function plot_pkest(cfg_fname)
     plot(km, Wmesh_sim.^(2*p-0*2*p), label="p=$p (\$W_s\$)")
     legend(fontsize="small")
     tight_layout()
-    savefig(outfname2)
+    savefig(outfname2, metadata=Dict("CreationDate"=>nothing))
 end
 
 

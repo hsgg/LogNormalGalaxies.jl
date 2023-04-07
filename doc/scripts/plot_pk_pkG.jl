@@ -1,17 +1,15 @@
 #!/usr/bin/env julia
 
-using Revise
-
-# load current LogNormalGalaxies version:
 using Pkg
-Pkg.activate((@__DIR__)*"/../..")
-using LogNormalGalaxies
-
-# load other dependencies:
 Pkg.activate(@__DIR__)
+using Revise
 using PyPlot
 using DelimitedFiles
 using Splines
+
+# load current LogNormalGalaxies version:
+include("../../src/LogNormalGalaxies.jl")
+using .LogNormalGalaxies
 
 
 function plot_pk_pkG()
@@ -43,7 +41,7 @@ function plot_pk_pkG()
     xlabel(L"$k$ in [$h$/Mpc]")
     ylabel(L"$P(k)$ in [Mpc/$h$]$^3$")
     mkpath((@__DIR__)*"/../figs/")
-    savefig((@__DIR__)*"/../figs/pk_pkG.pdf")
+    savefig((@__DIR__)*"/../figs/pk_pkG.pdf", metadata=Dict("CreationDate"=>nothing))
     println("Saved '$((@__DIR__)*"/../figs/pk_pkG.pdf'.")")
 end
 

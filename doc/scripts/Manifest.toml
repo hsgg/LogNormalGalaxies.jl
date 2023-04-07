@@ -2,7 +2,7 @@
 
 julia_version = "1.8.5"
 manifest_format = "2.0"
-project_hash = "42caad50989f69a36c5b900f38e555be3e669732"
+project_hash = "6a37ea58a5e9147bb87dc86e54ddd5304169aeb6"
 
 [[deps.AbstractFFTs]]
 deps = ["ChainRulesCore", "LinearAlgebra"]
@@ -977,9 +977,9 @@ version = "2.28.0+0"
 
 [[deps.MeasurePowerSpectra]]
 deps = ["AbstractFFTs", "ArbNumerics", "ArgParse", "BenchmarkTools", "CSV", "DelimitedFiles", "Distributions", "FFTW", "FastTransforms", "GR", "Healpix", "Interpolations", "Jacobi", "LinearAlgebra", "LogNormalGalaxies", "MPI", "MPIPreferences", "OrdinaryDiffEq", "PencilArrays", "PyCall", "PyPlot", "Revise", "Statistics", "StatsBase", "StatsPlots", "ToeplitzMatrices", "TwoFAST", "YAML"]
-path = "/Users/henry/.julia/dev/MeasurePowerSpectra"
+git-tree-sha1 = "606044d2eac59b5ded20ecf65006d5c515c9c903"
 uuid = "74159778-d4a3-4c31-b0f7-baeaee79979b"
-version = "0.3.1"
+version = "0.3.2"
 
 [[deps.Measures]]
 git-tree-sha1 = "c13304c81eec1ed3af7fc20e75fb6b26092a1102"
