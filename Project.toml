@@ -20,4 +20,8 @@ Strided = "5e0ebb24-38b0-5f93-81fe-25c709ecae67"
 TwoFAST = "0dd23c3e-f403-11e8-3e11-4dddf690af97"
 
 [compat]
+FFTW = "1"
+MPI = "0.20"
+QuadGK = "2"
+QuadOsc = "0.1"
 Strided = "1"
