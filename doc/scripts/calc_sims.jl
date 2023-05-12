@@ -34,7 +34,7 @@ function generate_sims(pk, nbar, b, f, L, n_sim, n_est, nrlzs; rfftplanner=LogNo
     #nx, ny, nz = n, floor(Int, 0.7n), floor(Int, 0.5n)
 
     sim_opts = (nmesh=n_sim, bias=b, rfftplanner=rfftplanner, voxel_window_power=sim_vox, velocity_assignment=sim_velo, sigma_psi=sigma_psi)
-    est_opts = (nbar=nbar, lmax=4, do_mu_leakage=true, subtract_shotnoise=true, voxel_window_power=est_vox, grid_assignment=est_grid_assignment)
+    est_opts = (nbar=nbar, lmax=4, do_mu_leakage=false, subtract_shotnoise=false, voxel_window_power=est_vox, grid_assignment=est_grid_assignment)
 
     # allocate outputs
     x⃗ = fill(0.0, 3, 1)

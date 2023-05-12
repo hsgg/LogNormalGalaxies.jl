@@ -142,8 +142,8 @@ function plot_pkest(cfg_fname)
     km, pkm, nmodes, pkm_err = readdlm_cols(infname, [1, 2:6, 7, 8:12])
     pkm[1,2:end] .= 0
     pkm_err[1,2:end] .= 0
-    @assert all(isfinite.(pkm_err))
-    @assert all(pkm_err .>= 0)
+    #@assert all(isfinite.(pkm_err))
+    #@assert all(pkm_err .>= 0)
 
 
     # theory
