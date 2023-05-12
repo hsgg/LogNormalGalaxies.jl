@@ -113,7 +113,10 @@ function main(args)
     println("Running...")
     km, pkm, nmodes, pkm_err = generate_sims(pk, nbar, b, f, L, n_sim, n_est, nrlzs; sim_vox, est_vox, sim_velo, est_grid_assignment, fxshift_est, fxshift_sim, sigma_psi)
 
-    writedlm(fname, [km pkm nmodes pkm_err])
+    open(fname, "w") do f
+        write(f, "# k\tpk0\tpk1\tpk2\tpk3\tpk4\tNmodes\tpk0err\tpk1err\tpk2err\tpk3err\tpk4err\n")
+        writedlm(f, [km pkm nmodes pkm_err])
+    end
 
     println("Saved results to '$fname'.")
 end

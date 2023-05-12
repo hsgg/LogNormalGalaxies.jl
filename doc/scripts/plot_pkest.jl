@@ -61,7 +61,7 @@ end
 
 
 function readdlm_cols(fname, cols)
-    data = readdlm(fname)
+    data, header = readdlm(fname; header=true)
     key = []
     for c in cols
         k = data[:,c]
