@@ -41,11 +41,11 @@ function generate_sims(pk, nbar, b, f, L, n_sim, n_est, nrlzs; rfftplanner=LogNo
     km, pkm, nmodes = xgals_to_pkl_planeparallel(x⃗, LLL, nnn_est, box_center; est_opts...)
     pkm = fill(0.0, length(km), size(pkm,2), nrlzs)
 
-    seeds = [rand(UInt64,4) for rlz=1:nrlzs]
+    #seeds = [rand(UInt64,4) for rlz=1:nrlzs]
 
     for rlz=1:nrlzs
         println("===== rlz = $rlz/$nrlzs")
-        Random.seed!(seeds[rlz])
+        #Random.seed!(seeds[rlz])
         rsd = (f != 0)
 
         # generate catalog
