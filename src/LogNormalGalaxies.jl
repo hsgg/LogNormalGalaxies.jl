@@ -154,6 +154,8 @@ function multiply_by_pk!(deltak, pkfn, kF::Tuple, Volume)
     return deltak
 end
 
+multiply_by_pk!(deltak, pkfn, kF, Volume) = multiply_by_pk!(deltak, pkfn, (kF...,), Volume)
+
 
 function calc_velocity_component!(deltak, kF::Tuple, coord)
     iterate_kspace(deltak; usethreads=true) do ijk_local,ijk_global
@@ -168,6 +170,8 @@ function calc_velocity_component!(deltak, kF::Tuple, coord)
     end
     return deltak
 end
+
+calc_velocity_component!(deltak, kF, coord) = calc_velocity_component!(deltak, (kF...,), coord)
 
 
 ##################### draw galaxies ###########################
