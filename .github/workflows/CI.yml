@@ -6,23 +6,26 @@ jobs:
   test:
     name: Julia ${{ matrix.version }} - ${{ matrix.os }} - ${{ matrix.arch }} - ${{ github.event_name }}
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
         version:
           - '1.6'
-          - 'nightly'
+          - '1'
+          #- 'nightly'
         os:
           - ubuntu-latest
         arch:
           - x64
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
+      - run: rm Manifest.toml  # julia-1.6 will fail with the newer manifest file
       - uses: julia-actions/setup-julia@v1
         with:
           version: ${{ matrix.version }}
           arch: ${{ matrix.arch }}
-      - uses: actions/cache@v1
+      - uses: actions/cache@v3
         env:
           cache-name: cache-artifacts
         with:
@@ -32,6 +35,10 @@ jobs:
             ${{ runner.os }}-test-${{ env.cache-name }}-
             ${{ runner.os }}-test-
             ${{ runner.os }}-
+      - uses: julia-actions/add-julia-registry@v1
+        with:
+          key: ${{ secrets.SSH_KEY }}
+          registry: Wide-Angle-Team/WATCosmologyJuliaRegistry
       - uses: julia-actions/julia-buildpkg@v1
       - uses: julia-actions/julia-runtest@v1
 #  docs:
@@ -42,6 +49,11 @@ jobs:
 #      - uses: julia-actions/setup-julia@v1
 #        with:
 #          version: '1'
+#      - run: pip install matplotlib
+#      - uses: julia-actions/add-julia-registry@v1
+#        with:
+#          key: ${{ secrets.SSH_KEY }}
+#          registry: Wide-Angle-Team/WATCosmologyJuliaRegistry
 #      - run: |
 #          julia --project=docs -e '
 #            using Pkg
