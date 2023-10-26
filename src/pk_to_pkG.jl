@@ -3,7 +3,7 @@
 # density field G=ln(1+\delta)-μ.
 
 
-#using PyPlot
+#using PythonPlot
 
 
 function xicalc00_quadosc(fn, r)

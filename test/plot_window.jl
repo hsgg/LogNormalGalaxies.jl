@@ -1,4 +1,4 @@
-using PyPlot
+using PythonPlot
 
 
 k = 10.0 .^ (-3:0.1:0)

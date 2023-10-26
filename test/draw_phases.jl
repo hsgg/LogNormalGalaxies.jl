@@ -1,5 +1,5 @@
 using LogNormalGalaxies
-using PyPlot
+using PythonPlot
 using Test
 
 

@@ -7,7 +7,7 @@ module test_lognormal
 using LogNormalGalaxies
 using Splines
 using MeasurePowerSpectra
-using PyPlot
+using PythonPlot
 using Random
 using DelimitedFiles
 #using QuadGK

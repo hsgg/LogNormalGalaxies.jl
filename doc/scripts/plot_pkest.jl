@@ -3,7 +3,7 @@
 using Pkg
 Pkg.activate(@__DIR__)
 using Revise
-using PyPlot
+using PythonPlot
 using DelimitedFiles
 using Splines
 using YAML

@@ -176,7 +176,6 @@ function draw_galaxies_with_velocities(deltar, vx, vy, vz, Ngalaxies, Δx=[1.0,1
     T = Float64
     rsd = !(vx == vy == vz == 0)
     Navg = Ngalaxies / prod(size_global(deltar))
-    @show Navg
     xyzv = fill(T(0), 6 * Ngalaxies)
     localrange = range_local(deltar)
     Ngalaxies_local_actual = 0

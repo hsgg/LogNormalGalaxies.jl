@@ -7,7 +7,7 @@ module lognormals
 using LogNormalGalaxies
 using Splines
 using MeasurePowerSpectra
-using PyPlot
+using PythonPlot
 using Random
 using DelimitedFiles
 #using MPI
