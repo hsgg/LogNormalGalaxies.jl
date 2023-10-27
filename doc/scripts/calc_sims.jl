@@ -15,15 +15,6 @@ include("../../src/LogNormalGalaxies.jl")
 using .LogNormalGalaxies
 
 
-function apply_RSD!(x⃗, Ψ, f, los)
-    Ngals = size(x⃗,2)
-    for i=1:Ngals
-        x⃗[:,i] .+= f * (Ψ[:,i]' * los) * los
-    end
-    return x⃗
-end
-
-
 function generate_sims(pk, nbar, b, f, L, n_sim, n_est, nrlzs; rfftplanner=LogNormalGalaxies.plan_with_fftw, sim_vox=0, est_vox=0, sim_velo=1, est_grid_assignment=1, fxshift_est=0, fxshift_sim=0, sigma_psi=0.0)
     LLL = [L, L, L]
     nnn_sim = [n_sim, n_sim, n_sim]
@@ -55,7 +46,7 @@ function generate_sims(pk, nbar, b, f, L, n_sim, n_est, nrlzs; rfftplanner=LogNo
         if rsd
             println("Apply RSD...")
             los = [0, 0, 1]
-            apply_RSD!(x⃗, Ψ, f, los)
+            apply_rsd!(x⃗, Ψ, f, los)
         end
 
         println("Shift grid by fractions $fxshift_est and $fxshift_sim...")

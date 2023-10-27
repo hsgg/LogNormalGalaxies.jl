@@ -13,15 +13,6 @@ function Arsd_Kaiser(β, ℓ)
 end
 
 
-function apply_RSD!(x⃗, Ψ, f, los)
-    Ngals = size(x⃗,2)
-    for i=1:Ngals
-        x⃗[:,i] .+= f * (Ψ[:,i]' * los) * los
-    end
-    return x⃗
-end
-
-
 function Statistics.middle(x...)
     return mean(x)
 end

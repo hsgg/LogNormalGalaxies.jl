@@ -12,7 +12,8 @@ module LogNormalGalaxies
 
 export simulate_galaxies,
        read_galaxies,
-       write_galaxies
+       write_galaxies,
+       apply_rsd!
 
 
 using Printf
@@ -40,6 +41,7 @@ j0(x) = sinc(x/π)  # this function is used in multiple locations
 include("pk_to_pkG.jl")
 include("arrays.jl")
 include("LinearInterpolations.jl")
+include("apply_rsd.jl")
 
 using .LinearInterpolations
 
