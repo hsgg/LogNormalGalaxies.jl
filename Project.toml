@@ -20,7 +20,7 @@ TwoFAST = "0dd23c3e-f403-11e8-3e11-4dddf690af97"
 
 [compat]
 FFTW = "1"
-MPI = "0.19, 0.20"
+MPI = "0.20"
 PencilFFTs = "0.14, 0.15"
 PoissonRandom = "0.4"
 QuadGK = "2"
