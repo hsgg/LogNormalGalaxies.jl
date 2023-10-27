@@ -20,7 +20,7 @@ TwoFAST = "0dd23c3e-f403-11e8-3e11-4dddf690af97"
 
 [compat]
 FFTW = "1"
-MPI = "0.19, 0.20"
+MPI = "0.20"
 PencilFFTs = "0.14, 0.15"
 PoissonRandom = "0.4"
 QuadGK = "2"
@@ -28,7 +28,7 @@ QuadOsc = "0.1"
 Splines = "0.2"
 Strided = "1, 2"
 TwoFAST = "0.1"
-julia = "1"
+julia = "^1.7"
 
 [extras]
 BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
