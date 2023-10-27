@@ -1,7 +1,7 @@
 name = "LogNormalGalaxies"
 uuid = "07f92fd4-8b9d-45a1-8a35-bfd730e456b6"
 authors = ["Henry Gebhardt <hsggebhardt@gmail.com>"]
-version = "0.6.1"
+version = "0.6.2"
 
 [deps]
 FFTW = "7a1cc6ca-52ef-59f5-83cd-3a7055c09341"
@@ -25,8 +25,10 @@ PencilFFTs = "0.14, 0.15"
 PoissonRandom = "0.4"
 QuadGK = "2"
 QuadOsc = "0.1"
+Splines = "0.2"
 Strided = "1, 2"
 TwoFAST = "0.1"
+julia = "1"
 
 [extras]
 BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
