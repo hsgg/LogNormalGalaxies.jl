@@ -13,7 +13,8 @@ module LogNormalGalaxies
 export simulate_galaxies,
        read_galaxies,
        write_galaxies,
-       apply_rsd!
+       apply_rsd!,
+       apply_periodic_boundaries!
 
 
 using Printf

@@ -53,7 +53,7 @@ function generate_sims(pk, nbar, b, f, L, n_sim, n_est, nrlzs; rfftplanner=LogNo
         @. x⃗ += fxshift_est * LLL / nnn_est + fxshift_sim * LLL / nnn_sim
 
         println("Apply periodic boundary...")
-        @time x⃗ = MeasurePowerSpectra.periodic_boundaries(x⃗, LLL, box_center)
+        @time x⃗ = apply_periodic_boundaries!(x⃗, LLL, box_center)
 
         # measure multipoles
         println("Measure power spectrum multipoles...")
