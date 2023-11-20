@@ -178,12 +178,11 @@ calc_velocity_component!(deltak, kF, coord) = calc_velocity_component!(deltak, (
 
 
 ##################### draw galaxies ###########################
-function draw_galaxies_with_velocities(deltar, vx, vy, vz, Ngalaxies, Δx=[1.0,1.0,1.0];
-        rng=Random.GLOBAL_RNG, voxel_window_power=1, velocity_assignment=1)
+function draw_galaxies_with_velocities(deltar, vx, vy, vz, Ngalaxies, Δx, ::Val{do_rsd}, ::Val{voxel_window_power}, ::Val{velocity_assignment};
+        rng=Random.GLOBAL_RNG) where {do_rsd,voxel_window_power,velocity_assignment}
     T = Float64
-    rsd = !(vx == vy == vz == 0)
     Navg = Ngalaxies / prod(size_global(deltar))
-    xyzv = fill(T(0), 6 * Ngalaxies)
+    xyzv = fill(T(0), 6 * ceil(Int, Ngalaxies + 3 * √Ngalaxies))  # mean + 3 * stddev
     localrange = range_local(deltar)
     Ngalaxies_local_actual = 0
 
@@ -204,7 +203,7 @@ function draw_galaxies_with_velocities(deltar, vx, vy, vz, Ngalaxies, Δx=[1.0,1
         g0 = 6 * Ngalaxies_local_actual  # g0 is the index in the xyzv 1D-array
         if g0 + 6 * Nthiscell > length(xyzv)
             resize!(xyzv, length(xyzv) + 6*Nthiscell)
-            xyzv[(g0+1):end] .= 0  # in case rsd=false
+            xyzv[(g0+1):end] .= 0  # in case do_rsd=false
         end
 
         for _=1:Nthiscell
@@ -222,7 +221,7 @@ function draw_galaxies_with_velocities(deltar, vx, vy, vz, Ngalaxies, Δx=[1.0,1
             xyzv[g0+2] = y*Δx[2]
             xyzv[g0+3] = z*Δx[3]
 
-            if rsd
+            if do_rsd
                 if velocity_assignment == 0
                     # Current grid point
                     xyzv[g0+4] = vx[i,j,k]
@@ -529,12 +528,14 @@ function simulate_galaxies(nxyz, Lxyz, Ngalaxies, pk, b, faH; rfftplan=default_p
 
         vki = nothing  # free memory
         deltakm = nothing  # free memory
+        do_rsd = true
     else
         vx = vy = vz = 0
+        do_rsd = false
     end
 
     println("Draw galaxies...")
-    @time xyzv = draw_galaxies_with_velocities(deltarg, vx, vy, vz, Ngalaxies, Δx; rng, voxel_window_power, velocity_assignment)
+    @time xyzv = draw_galaxies_with_velocities(deltarg, vx, vy, vz, Ngalaxies, Δx, Val(do_rsd), Val(voxel_window_power), Val(velocity_assignment); rng)
 
     # FoG: sigma_u = f * sigma_psi
     if sigma_psi != 0
