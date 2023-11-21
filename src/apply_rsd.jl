@@ -1,11 +1,43 @@
 
+function apply_rsd!(positions, velocities; los=:vlos)
+    apply_rsd!(positions, velocities, los)
+end
 
-function apply_rsd!(x⃗, Ψ, f, los=[0,0,1])
-    Ngals = size(x⃗,2)
-    for i=1:Ngals
-        x⃗[:,i] .+= f * (Ψ[:,i]' * los) * los
+function apply_rsd!(positions, velocities, los=:vlos)
+    apply_rsd!(positions, velocities, Val(los))
+end
+
+
+function apply_rsd!(positions, velocities, ::Val{los}) where {los}
+
+    Ngals = size(positions,2)
+
+    Threads.@threads for i=1:Ngals
+
+        xvec = @view positions[:,i]
+        velo = @view velocities[:,i]
+
+        if los == :vlos
+            mylos = xvec
+        else
+            mylos = los
+        end
+
+        r2 = mylos' * mylos
+
+        uz_r = (velo' * mylos) / r2
+
+        @. xvec += uz_r * mylos
     end
-    return x⃗
+
+    return positions
+end
+
+
+# compatibility:
+function apply_rsd!(xyz, psi, f, los)
+    velo = @strided @. f * psi
+    apply_rsd!(xyz, velo, los)
 end
 
 
