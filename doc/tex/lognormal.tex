@@ -472,6 +472,157 @@ Requiring the average density contrast to vanish, we get
     &= e^{\Sigma_{ij}} - 1\,.
 \ea
 
+%%%%%%%%%%%%%%%%
+\subsection{Bispectrum of Lognormal Simulations}
+First, the skew is defined as
+\ba
+\Gamma
+&= 
+\<\(\frac{\delta - \<\delta\>}{\sigma_\delta}\)^3\>
+= 
+\<\(\frac{\delta}{\sqrt{\<\delta^2\>}}\)^3\>,
+\ea
+where we assumed that the average $\<\delta\>=0$ vanishes.
+Then the skew of the lognormal distribution is
+\ba
+\Gamma
+&=
+\(e^{\sigma^2} + 2\)
+\sqrt{e^{\sigma^2} - 1}\,.
+\ea
+Or,
+\ba
+\<\delta^3\>
+&=
+\sigma_\delta^3 \, \Gamma
+=
+\(e^{\sigma^2} - 1\)^{2}
+\(e^{\sigma^2} + 2\)
+\\
+&=
+e^{3\sigma^2} - 3\,e^{\sigma^2} + 2\,.
+\ea
+Or, when the average does not vanish \citep{Coles+:1991MNRAS.248....1C},
+\ba
+\mu_3
+&=
+e^{3\mu + \frac32\sigma^2}
+\left[e^{\sigma^2} - 1\right]^2
+\left[e^{\sigma^2} + 2\right].
+\ea
+The generalization is
+\ba
+\mu_3^{ijk}
+&=
+e^{\mu_i + \mu_j + \mu_k + \frac12\left[\Sigma_{ii} + \Sigma_{jj} + \Sigma_{kk}\right]}
+\vs&\quad\times
+\left[e^{\Sigma_{ij} + \Sigma_{jk} + \Sigma_{ki}}
+  - e^{\Sigma_{ij}}
+  - e^{\Sigma_{jk}}
+  - e^{\Sigma_{ki}}
++ 2\right].
+\ea
+Or, for a field with vanishing mean,
+\ba
+\<\delta_i \delta_j \delta_k\>
+&=
+e^{\Sigma_{ij} + \Sigma_{jk} + \Sigma_{ki}}
+- e^{\Sigma_{ij}}
+- e^{\Sigma_{jk}}
+- e^{\Sigma_{ki}}
++ 2
+\\
+&=
+[\xi_{ij}+1]
+[\xi_{jk}+1]
+[\xi_{ki}+1]
+- 1
+- \xi_{ij}
+- \xi_{jk}
+- \xi_{ki}
+\\
+&=
+\xi_{ij} \xi_{jk} \xi_{ki}
++ \xi_{jk} \xi_{ki}
++ \xi_{ij} \xi_{ki}
++ \xi_{ij} \xi_{jk}\,,
+\label{eq:ln_3pt}
+\ea
+which agrees with \citet{Coles+:1991MNRAS.248....1C}.
+
+To get the bispectrum, transform to Fourier space.
+In \cref{eq:ln_3pt} the terms with two 2-point functions can be converted to
+Fourier space in the following way. For example,
+\ba
+B_{12,23}
+&=
+(2\pi)^3 \delta^D(\vk_{123})
+\int\dd^3s_{12}
+\,e^{-i\vk_1\cdot\vvs_{12}}
+\,\xi(\vvs_{12})
+\vs&\quad\times
+\int\dd^3s_{23}
+\,e^{i\vk_3\cdot\vvs_{23}}
+\,\xi(\vvs_{23})
+\\
+&=
+(2\pi)^3 \delta^D(\vk_{123})
+\,P(\vk_1)
+\,P(\vk_3)\,.
+\ea
+The term with three 2-point functions involves a convolution,
+\ba
+B_{12,23,31}
+&=
+\int\dd^3r_{1}
+\int\dd^3r_{2}
+\int\dd^3r_{3}
+\,e^{-i\vk_1\cdot\vr_{1}}
+\,e^{-i\vk_2\cdot\vr_{2}}
+\,e^{-i\vk_3\cdot\vr_{3}}
+\vs&\quad\times
+\,\xi(\vvs_{12})
+\,\xi(\vvs_{23})
+\,\xi(\vvs_{31})
+\\
+&=
+\int\dd^3r_{1}
+\int\dd^3r_{2}
+\int\dd^3r_{3}
+\,e^{-i\vk_1\cdot\vr_{1}}
+\,e^{-i\vk_2\cdot\vr_{2}}
+\,e^{-i\vk_3\cdot\vr_{3}}
+\vs&\quad\times
+\int\frac{\dd^3q_1}{(2\pi)^3}\,e^{i\vq_1\cdot\vvs_{12}}\,P(\vq_1)
+\vs&\quad\times
+\int\frac{\dd^3q_2}{(2\pi)^3}\,e^{i\vq_2\cdot\vvs_{23}}\,P(\vq_2)
+\vs&\quad\times
+\int\frac{\dd^3q_3}{(2\pi)^3}\,e^{i\vq_3\cdot\vvs_{31}}\,P(\vq_3)
+\\
+&=
+\int\frac{\dd^3q_1}{(2\pi)^3}
+\int\frac{\dd^3q_2}{(2\pi)^3}
+\int\frac{\dd^3q_3}{(2\pi)^3}
+\,P(\vq_1)
+\,P(\vq_2)
+\,P(\vq_3)
+\vs&\quad\times
+(2\pi)^3 \delta^D(\vk_1 + \vq_3 - \vq_1)
+\vs&\quad\times
+(2\pi)^3 \delta^D(\vk_2 + \vq_1 - \vq_2)
+\vs&\quad\times
+(2\pi)^3 \delta^D(\vk_3 + \vq_2 - \vq_3)
+\\
+&=
+(2\pi)^3 \delta^D(\vk_1 + \vk_2 + \vk_3)
+\vs&\quad\times
+\int\frac{\dd^3q_3}{(2\pi)^3}
+\,P(\vk_1 + \vk_2 + \vq_3)
+\,P(\vk_2 + \vq_3)
+\,P(\vq_3)
+\ea
+The bispectrum multipoles are\ldots
+
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
