@@ -3,7 +3,12 @@ function apply_rsd!(positions, velocities; los=:vlos)
     apply_rsd!(positions, velocities, los)
 end
 
-function apply_rsd!(positions, velocities, los=:vlos)
+function apply_rsd!(positions, velocities, los)
+    if los != :vlos
+        # If this is called from python, then los may be a PyList() object.
+        # This should convert it to something more useful to the compiler.
+        los = (los...,)
+    end
     apply_rsd!(positions, velocities, Val(los))
 end
 
@@ -23,9 +28,9 @@ function apply_rsd!(positions, velocities, ::Val{los}) where {los}
             mylos = los
         end
 
-        r2 = mylos' * mylos
+        r2 = dot(mylos, mylos)
 
-        uz_r = (velo' * mylos) / r2
+        uz_r = dot(velo, mylos) / r2
 
         @. xvec += uz_r * mylos
     end

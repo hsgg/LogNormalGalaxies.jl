@@ -199,6 +199,9 @@ using BenchmarkTools
     end
 
 
+    include("apply_rsd.jl")
+
+
     ## This meant to be used more interactively:
     #include("lognormals_50sims.jl")
 end
