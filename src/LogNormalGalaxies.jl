@@ -178,10 +178,11 @@ calc_velocity_component!(deltak, kF, coord) = calc_velocity_component!(deltak, (
 
 
 ##################### draw galaxies ###########################
-function draw_galaxies_with_velocities(deltar, vx, vy, vz, Ngalaxies, Δx, ::Val{do_rsd}, ::Val{voxel_window_power}, ::Val{velocity_assignment};
+function draw_galaxies_with_velocities(deltar, vx, vy, vz, Navg, Ngalaxies, Δx,
+        ::Val{do_rsd}, ::Val{voxel_window_power}, ::Val{velocity_assignment};
         rng=Random.GLOBAL_RNG) where {do_rsd,voxel_window_power,velocity_assignment}
     T = Float64
-    Navg = Ngalaxies / prod(size_global(deltar))
+
     xyzv = fill(T(0), 6 * ceil(Int, Ngalaxies + 3 * √Ngalaxies))  # mean + 3 * stddev
     localrange = range_local(deltar)
     Ngalaxies_local_actual = 0
@@ -392,6 +393,21 @@ function var_global(arr, comm=MPI.COMM_WORLD)
 end
 
 
+# mean_global(): Calculate mean of the given array, taking care of proper
+# handling of distributed arrays such as PencilArrays.
+function mean_global(arr, comm=MPI.COMM_WORLD)
+    n = length(arr)
+    μ = mean(arr)
+    if MPI.Initialized()
+        nn = MPI.Allgather(n, comm)
+        μμ = MPI.Allgather(μ, comm)
+        n = sum(nn)
+        μ = sum(@. nn / n * μμ)
+    end
+    return μ
+end
+
+
 # Fourier transform of a unit sphere.
 function W(x)
     if abs(x) < 2e-1
@@ -440,7 +456,7 @@ end
 # their interface.
 
 # simulate galaxies
-function simulate_galaxies(nxyz, Lxyz, Ngalaxies, pk, b, faH; rfftplan=default_plan(nxyz), rng=Random.GLOBAL_RNG, voxel_window_power=1, velocity_assignment=1, sigma_psi=0.0, fixed=false, gather=true)
+function simulate_galaxies(nxyz, Lxyz, nbar, pk, b, faH; rfftplan=default_plan(nxyz), rng=Random.GLOBAL_RNG, voxel_window_power=1, velocity_assignment=1, win=1, sigma_psi=0.0, fixed=false, gather=true)
     nx, ny, nz = nxyz
     Lx, Ly, Lz = Lxyz
     Volume = Lx * Ly * Lz
@@ -534,8 +550,14 @@ function simulate_galaxies(nxyz, Lxyz, Ngalaxies, pk, b, faH; rfftplan=default_p
         do_rsd = false
     end
 
+    println("Apply window...")
+    @strided @. deltarg = (1 + deltarg) * win - 1
+
     println("Draw galaxies...")
-    @time xyzv = draw_galaxies_with_velocities(deltarg, vx, vy, vz, Ngalaxies, Δx, Val(do_rsd), Val(voxel_window_power), Val(velocity_assignment); rng)
+    Ncells = prod(size_global(deltarg))
+    Navg = nbar * prod(Δx)
+    Ngalaxies = Navg * Ncells * mean_global(win)
+    @time xyzv = draw_galaxies_with_velocities(deltarg, vx, vy, vz, Navg, Ngalaxies, Δx, Val(do_rsd), Val(voxel_window_power), Val(velocity_assignment); rng)
 
     # FoG: sigma_u = f * sigma_psi
     if sigma_psi != 0
@@ -559,7 +581,7 @@ end
 
 function simulate_galaxies(nbar, Lbox, pk; nmesh=256, bias=1.0, f=false,
         rfftplanner=default_plan, rng=Random.GLOBAL_RNG, voxel_window_power=1,
-        velocity_assignment=1, sigma_psi=0.0, fixed=false, gather=true)
+        velocity_assignment=1, win=1, sigma_psi=0.0, fixed=false, gather=true)
 
     if nmesh isa Number
         nxyz = nmesh, nmesh, nmesh
@@ -573,15 +595,12 @@ function simulate_galaxies(nbar, Lbox, pk; nmesh=256, bias=1.0, f=false,
         Lxyz = Lbox
     end
 
-    Volume = prod(Lxyz)
-    Ngalaxies = ceil(Int, Volume * nbar)
-
     @time rfftplan = rfftplanner(nxyz)
 
-    @time xyzv = simulate_galaxies(nxyz, Lxyz, Ngalaxies, pk, bias, f;
+    @time xyzv = simulate_galaxies(nxyz, Lxyz, nbar, pk, bias, f;
                                    rfftplan, rng, voxel_window_power,
-                                   velocity_assignment, sigma_psi, fixed,
-                                   gather)
+                                   velocity_assignment, sigma_psi, win,
+                                   fixed, gather)
     println("Post-processing...")
     @time xyz = @. xyzv[1:3,:] - Lbox / 2
     @time v = xyzv[4:6,:]

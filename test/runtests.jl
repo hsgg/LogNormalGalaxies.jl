@@ -115,10 +115,11 @@ using BenchmarkTools
         vz = randn(nnn...) / 10
         Ngalaxies = 1_000_000
         Δx = [1.0, 1.0, 1.0]
-        @time xyzv = LogNormalGalaxies.draw_galaxies_with_velocities(deltar, vx, vy, vz, Ngalaxies, Δx, Val(true), Val(2), Val(6))
-        @time xyzv = LogNormalGalaxies.draw_galaxies_with_velocities(deltar, vx, vy, vz, Ngalaxies, Δx, Val(true), Val(2), Val(6))
-        @time xyzv = LogNormalGalaxies.draw_galaxies_with_velocities(deltar, vx, vy, vz, Ngalaxies, Δx, Val(true), Val(2), Val(6))
-        @btime LogNormalGalaxies.draw_galaxies_with_velocities($deltar, $vx, $vy, $vz, $Ngalaxies, $Δx, Val(true), Val(2), Val(6))
+        Navg = Ngalaxies / prod(nnn)
+        @time xyzv = LogNormalGalaxies.draw_galaxies_with_velocities(deltar, vx, vy, vz, Navg, Ngalaxies, Δx, Val(true), Val(2), Val(6))
+        @time xyzv = LogNormalGalaxies.draw_galaxies_with_velocities(deltar, vx, vy, vz, Navg, Ngalaxies, Δx, Val(true), Val(2), Val(6))
+        @time xyzv = LogNormalGalaxies.draw_galaxies_with_velocities(deltar, vx, vy, vz, Navg, Ngalaxies, Δx, Val(true), Val(2), Val(6))
+        @btime LogNormalGalaxies.draw_galaxies_with_velocities($deltar, $vx, $vy, $vz, $Navg, $Ngalaxies, $Δx, Val(true), Val(2), Val(6))
     end
 
 
