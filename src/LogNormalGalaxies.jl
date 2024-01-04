@@ -551,7 +551,7 @@ function simulate_galaxies(nxyz, Lxyz, nbar, pk, b, faH; rfftplan=default_plan(n
     end
 
     println("Apply window...")
-    @strided @. deltarg = (1 + deltarg) * win - 1
+    @time @strided @. deltarg = (1 + deltarg) * win - 1
 
     println("Draw galaxies...")
     Ncells = prod(size_global(deltarg))
