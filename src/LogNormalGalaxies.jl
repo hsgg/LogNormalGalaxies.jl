@@ -537,7 +537,8 @@ function simulate_galaxies(nxyz, Lxyz, nbar, pk, b, faH; rfftplan=default_plan(n
         #@time @strided @. vy *= faH * (nx*ny*nz) / Volume
 
         println("Calculate vz...")
-        @time @strided @. vki = deltakm
+        #@time @strided @. vki = deltakm
+        @time vki = deltakm  # Note: last time we use deltakm, so can overwrite
         @time calc_velocity_component!(vki, kF, 3)
         @time vz = rfftplan \ vki
         #@time @strided @. vz *= faH * (nx*ny*nz) / Volume
