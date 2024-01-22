@@ -596,7 +596,11 @@ function simulate_galaxies(nbar, Lbox, pk; nmesh=256, bias=1.0, f=false,
         Lxyz = Lbox
     end
 
-    @time rfftplan = rfftplanner(nxyz)
+    @time if rfftplanner isa Function
+        rfftplan = rfftplanner(nxyz)
+    else
+        rfftplan = rfftplanner
+    end
 
     @time xyzv = simulate_galaxies(nxyz, Lxyz, nbar, pk, bias, f;
                                    rfftplan, rng, voxel_window_power,
