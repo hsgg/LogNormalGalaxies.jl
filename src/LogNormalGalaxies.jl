@@ -110,19 +110,20 @@ function draw_phases(rfftplan; rng=Random.GLOBAL_RNG)
 end
 
 
-function calc_global_indices(ijk_local, localrange, ny2, nz2, ny, nz)
+function calc_global_indices(ijk_local, localrange, nx2, ny2, nz2, nx, ny, nz)
     ig = localrange[1][ijk_local[1]]  # global index of local index i
     jg = localrange[2][ijk_local[2]]  # global index of local index j
     kg = localrange[3][ijk_local[3]]  # global index of local index k
-    ig = ig - 1
+    ig = ig <= nx2 ? ig-1 : ig-1-nx
     jg = jg <= ny2 ? jg-1 : jg-1-ny
     kg = kg <= nz2 ? kg-1 : kg-1-nz
     return ig, jg, kg
 end
 
 
-function iterate_kspace(func, deltak; usethreads=false)
-    nx2, ny, nz = size_global(deltak)
+function iterate_kspace(func, deltak; usethreads=false, first_half_dimension=true)
+    nx, ny, nz = size_global(deltak)
+    nx2 = first_half_dimension ? nx : (div(nx,2) + 1)
     ny2 = div(ny,2) + 1
     nz2 = div(nz,2) + 1
     localrange = range_local(deltak)
@@ -131,20 +132,22 @@ function iterate_kspace(func, deltak; usethreads=false)
         Threads.@threads for k=1:size(deltak,3)
             for j=1:size(deltak,2), i=1:size(deltak,1)
                 ijk_local = (i, j, k)
-                ijk_global = calc_global_indices(ijk_local, localrange, ny2, nz2, ny, nz)
+                ijk_global = calc_global_indices(ijk_local, localrange, nx2, ny2, nz2, nx, ny, nz)
                 func(ijk_local, ijk_global)
             end
         end
     else
         for k=1:size(deltak,3), j=1:size(deltak,2), i=1:size(deltak,1)
             ijk_local = (i, j, k)
-            ijk_global = calc_global_indices(ijk_local, localrange, ny2, nz2, ny, nz)
+            ijk_global = calc_global_indices(ijk_local, localrange, nx2, ny2, nz2, nx, ny, nz)
             func(ijk_local, ijk_global)
         end
     end
 
     return deltak
 end
+
+iterate_rspace(args...; kwargs...) = iterate_kspace(args...; kwargs..., first_half_dimension=false)
 
 
 function multiply_by_pk!(deltak, pkfn, kF::Tuple, Volume)
