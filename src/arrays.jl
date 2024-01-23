@@ -8,7 +8,7 @@
 
 ######### functions for both FFTW and PencilFFTs array types
 
-allocate_array(shape, T::DataType) = Array{T}(undef, shape)
+allocate_array(shape, T::DataType) = Array{T}(undef, shape...)
 allocate_array(pen::Pencil, T::DataType) = PencilArray{T}(undef, Pencil(pen))
 
 # allocate input, but allow a different type (useful to ensure the same topology is used)
