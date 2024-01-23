@@ -8,14 +8,18 @@
 
 ######### functions for both FFTW and PencilFFTs array types
 
-allocate_array(shape, type::DataType) = Array{type}(undef, shape)
-allocate_array(pen::Pencil, type::DataType) = PencilArray{type}(undef, Pencil(pen))
+allocate_array(shape, T::DataType) = Array{T}(undef, shape)
+allocate_array(pen::Pencil, T::DataType) = PencilArray{T}(undef, Pencil(pen))
+
+# allocate input, but allow a different type (useful to ensure the same topology is used)
+allocate_array(p::FFTW.FFTWPlan, T::DataType) = allocate_array(size(p), T)
+allocate_array(p::PencilFFTPlan, T::DataType) = allocate_array(pencil_input(p), T)
 
 
 ############### functions to extend PencilArrays ####
 
 Base.deepcopy(pa::PencilArray) = PencilArray(pencil(pa), deepcopy(parent(pa)))
-Strided.StridedView(a::PencilArray) = Strided.StridedView(parent(a))  # FIXME: incomplete if there are permutations. To fix, need to figure out how to get the permutated view.
+Strided.StridedView(a::PencilArray) = Strided.StridedView(parent(a))  # FIXME: incomplete if there are permutations. To fix, need to figure out how to get the permutated view. However, this should only matter for things like matrix multiplication, where it is NOT just element-wise.
 
 
 ############### functions to extend base Arrays ####
