@@ -13,7 +13,7 @@ allocate_array(pen::Pencil, T::DataType) = PencilArray{T}(undef, Pencil(pen))
 
 # allocate input, but allow a different type (useful to ensure the same topology is used)
 allocate_array(p::FFTW.FFTWPlan, T::DataType) = allocate_array(size(p), T)
-allocate_array(p::PencilFFTPlan, T::DataType) = allocate_array(pencil_input(p), T)
+allocate_array(p::PencilFFTPlan, T::DataType) = allocate_array(PencilFFTs.pencil_input(p), T)
 
 
 ############### functions to extend PencilArrays ####
