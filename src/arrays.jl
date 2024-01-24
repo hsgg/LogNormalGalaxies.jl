@@ -111,9 +111,11 @@ end
 
 
 function test_mpi()
+    @show MPI.Initialized()
     start_mpi()
     comm = MPI.COMM_WORLD
     rank = MPI.Comm_rank(comm)
+    @show MPI.Initialized()
 
     len = rand(1:9)
     x = Float32[rank + i/10 for i=1:len]
@@ -133,6 +135,29 @@ function test_mpi()
         MPI.Send(x, 0, 1, comm)
     end
     @show "done",rank
+end
+
+
+function test_pencilffts()
+    @show MPI.Initialized()
+    start_mpi()
+    comm = MPI.COMM_WORLD
+    rank = MPI.Comm_rank(comm)
+
+    @show MPI.Initialized()
+
+    A = rand(ComplexF64, 256, 256, 256)
+    B = rand(256, 256, 256)
+    C = rand(ComplexF64, 129, 256, 256)
+    p0 = plan_fft!(A; flags=FFTW.MEASURE)
+    p1 = plan_rfft(B; flags=FFTW.MEASURE)
+    p1i = plan_irfft(C, 256; flags=FFTW.MEASURE)
+
+    # the `fftw_flags` argument causes problems
+    p2 = plan_with_pencilffts((512,512,512))#, fftw_flags=FFTW.MEASURE)
+
+    allocate_array(p1, Int8)
+    allocate_array(p2, Int8)
 end
 
 
