@@ -583,6 +583,13 @@ function simulate_galaxies(nxyz, Lxyz, nbar, pk, b, faH; rfftplan=default_plan(n
 end
 
 
+@doc raw"""
+    simulate_galaxies(nbar, Lbox, pk; nmesh=256, bias=1.0, f=false,
+        rfftplanner=default_plan, rng=Random.GLOBAL_RNG, voxel_window_power=1,
+        velocity_assignment=1, win=1, sigma_psi=0.0, fixed=false, gather=true)
+
+Simulate galaxies using log-normal statistics.
+"""
 function simulate_galaxies(nbar, Lbox, pk; nmesh=256, bias=1.0, f=false,
         rfftplanner=default_plan, rng=Random.GLOBAL_RNG, voxel_window_power=1,
         velocity_assignment=1, win=1, sigma_psi=0.0, fixed=false, gather=true)
