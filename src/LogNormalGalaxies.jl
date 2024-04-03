@@ -147,6 +147,7 @@ function iterate_kspace(func, deltak; usethreads=false, first_half_dimension=tru
     return deltak
 end
 
+# We still have that the index (1,1,1) maps to x⃑ = (0,0,0)
 iterate_rspace(args...; kwargs...) = iterate_kspace(args...; kwargs..., first_half_dimension=false)
 
 
