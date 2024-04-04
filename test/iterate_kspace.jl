@@ -12,7 +12,7 @@ using LogNormalGalaxies
 
 
     # k-space
-    LogNormalGalaxies.iterate_kspace(kgrid; usethreads=false) do ijk_local, ijk_global
+    LogNormalGalaxies.iterate_kspace(kgrid) do ijk_local, ijk_global
         if ijk_local == (1,1,1)
             @test ijk_global == (0,0,0)
         end
@@ -37,7 +37,7 @@ using LogNormalGalaxies
 
 
     # r-space
-    LogNormalGalaxies.iterate_rspace(kgrid; usethreads=false) do ijk_local, ijk_global
+    LogNormalGalaxies.iterate_rspace(kgrid) do ijk_local, ijk_global
         if ijk_local == (1,1,1)
             @test ijk_global == (0,0,0)
         end
