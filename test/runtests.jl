@@ -201,6 +201,7 @@ using BenchmarkTools
 
 
     include("apply_rsd.jl")
+    include("iterate_kspace.jl")
 
 
     ## This meant to be used more interactively:

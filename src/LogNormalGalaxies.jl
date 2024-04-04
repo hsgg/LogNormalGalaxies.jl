@@ -111,13 +111,13 @@ end
 
 
 function calc_global_indices(ijk_local, localrange, nx2, ny2, nz2, nx, ny, nz; wrap)
-    ig = localrange[1][ijk_local[1]]  # global index of local index i
-    jg = localrange[2][ijk_local[2]]  # global index of local index j
-    kg = localrange[3][ijk_local[3]]  # global index of local index k
+    ig = localrange[1][ijk_local[1]] - 1  # global index of local index i
+    jg = localrange[2][ijk_local[2]] - 1  # global index of local index j
+    kg = localrange[3][ijk_local[3]] - 1  # global index of local index k
     if wrap
-        ig = ig <= nx2 ? ig-1 : ig-1-nx
-        jg = jg <= ny2 ? jg-1 : jg-1-ny
-        kg = kg <= nz2 ? kg-1 : kg-1-nz
+        ig = ig < nx2 ? ig : ig-nx
+        jg = jg < ny2 ? jg : jg-ny
+        kg = kg < nz2 ? kg : kg-nz
     end
     return ig, jg, kg
 end
