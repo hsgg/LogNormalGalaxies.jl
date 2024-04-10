@@ -138,26 +138,33 @@ function test_mpi()
 end
 
 
-function test_pencilffts()
-    @show MPI.Initialized()
-    start_mpi()
-    comm = MPI.COMM_WORLD
+function test_pencilffts(Nmesh=512)
+    MPI.Initialized() || MPI.Init()
     rank = MPI.Comm_rank(comm)
+    println("MPI initialized. This is rank $(rank) of $(MPI.Comm_size(comm)).")
 
-    @show MPI.Initialized()
 
-    A = rand(ComplexF64, 256, 256, 256)
-    B = rand(256, 256, 256)
-    C = rand(ComplexF64, 129, 256, 256)
+    println("FFTW:")
     p0 = plan_fft!(A; flags=FFTW.MEASURE)
-    p1 = plan_rfft(B; flags=FFTW.MEASURE)
-    p1i = plan_irfft(C, 256; flags=FFTW.MEASURE)
+    A = rand(ComplexF64, 256, 256, 256)
+    fft!(A)
+    fftshift!(A)
 
-    # the `fftw_flags` argument causes problems
-    p2 = plan_with_pencilffts((512,512,512))#, fftw_flags=FFTW.MEASURE)
 
-    allocate_array(p1, Int8)
-    allocate_array(p2, Int8)
+    println("PencilFFTs.jl:")
+
+    proc_dims = MPI.Dims_create(MPI.Comm_size(comm), zeros(Int, 2))
+    proc_dims = tuple(Int64.(proc_dims)...)
+    transform = Transforms.RFFT()
+    @show proc_dims typeof(proc_dims)
+
+    # the `fftw_flags` argument causes segfaults
+    @time p1 = PencilFFTPlan((Nmesh,Nmesh,Nmesh), transform, proc_dims, comm)#; fftw_flags=FFTW.MEASURE)
+
+    @time B = allocate_input(p1)
+    @time rand!(B)
+    @time C = p1 * B
+    @time D = p1 \ C
 end
 
 
