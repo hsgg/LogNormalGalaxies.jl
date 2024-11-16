@@ -41,6 +41,7 @@ j0(x) = sinc(x/π)  # this function is used in multiple locations
 # intra-module include files
 include("pk_to_pkG.jl")
 include("arrays.jl")
+include("mpi.jl")
 include("LinearInterpolations.jl")
 include("apply_rsd.jl")
 
@@ -108,49 +109,6 @@ function draw_phases(rfftplan; rng=Random.GLOBAL_RNG)
     #@show var(real(deltak_phases)) var(imag(deltak_phases))
     return deltak_phases
 end
-
-
-function calc_global_indices(ijk_local, localrange, nx2, ny2, nz2, nx, ny, nz; wrap)
-    ig = localrange[1][ijk_local[1]] - 1  # global index of local index i
-    jg = localrange[2][ijk_local[2]] - 1  # global index of local index j
-    kg = localrange[3][ijk_local[3]] - 1  # global index of local index k
-    if wrap
-        ig = ig < nx2 ? ig : ig-nx
-        jg = jg < ny2 ? jg : jg-ny
-        kg = kg < nz2 ? kg : kg-nz
-    end
-    return ig, jg, kg
-end
-
-
-function iterate_kspace(func, deltak; usethreads=false, first_half_dimension=true, wrap=true)
-    nx, ny, nz = size_global(deltak)
-    nx2 = first_half_dimension ? nx : (div(nx,2) + 1)
-    ny2 = div(ny,2) + 1
-    nz2 = div(nz,2) + 1
-    localrange = range_local(deltak)
-
-    if usethreads
-        Threads.@threads for k=1:size(deltak,3)
-            for j=1:size(deltak,2), i=1:size(deltak,1)
-                ijk_local = (i, j, k)
-                ijk_global = calc_global_indices(ijk_local, localrange, nx2, ny2, nz2, nx, ny, nz; wrap)
-                func(ijk_local, ijk_global)
-            end
-        end
-    else
-        for k=1:size(deltak,3), j=1:size(deltak,2), i=1:size(deltak,1)
-            ijk_local = (i, j, k)
-            ijk_global = calc_global_indices(ijk_local, localrange, nx2, ny2, nz2, nx, ny, nz; wrap)
-            func(ijk_local, ijk_global)
-        end
-    end
-
-    return deltak
-end
-
-# The index (1,1,1) maps to x⃑ = (0,0,0).
-iterate_rspace(args...; kwargs...) = iterate_kspace(args...; first_half_dimension=false, wrap=false, kwargs...)
 
 
 function multiply_by_pk!(deltak, pkfn, kF::Tuple, Volume)
