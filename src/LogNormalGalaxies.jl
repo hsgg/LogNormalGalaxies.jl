@@ -164,6 +164,12 @@ function scale_by_pk!(deltak, pk::AbstractArray{T,2}, bias, _, Volume) where {T<
 end
 
 
+function scale_by_pk!(deltak, pk::AbstractArray{T,1}, bias, _, Volume) where {T<:Number}
+    # reduce to 2D-array case with only a monopole:
+    scale_by_pk!(deltak, pk[:,:], bias, nothing, Volume)
+end
+
+
 ################## calc velocities ###########################
 
 function calc_velocity_component!(deltak, kF::Tuple, coord)

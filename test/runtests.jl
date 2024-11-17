@@ -196,6 +196,25 @@ using BenchmarkTools
     end
 
 
+    @testset "1D-Array pk" begin
+        println("Test array typed pk:")
+        nbar = 3e-4
+        L = 100.0
+        n = 64
+        b = 1.5
+        f = 1
+        lmax = 4
+
+        pk = rand(n)
+        @show typeof(pk)
+
+        x⃗, Ψ = simulate_galaxies(nbar, L, pk; nmesh=n, bias=b, f=1, rfftplanner=LogNormalGalaxies.plan_with_fftw)
+        x⃗, Ψ = simulate_galaxies(nbar, L, pk; nmesh=n, bias=b, f=false, rfftplanner=LogNormalGalaxies.plan_with_fftw)
+        x⃗, Ψ = simulate_galaxies(nbar, [L,L,L], pk; nmesh=[n,n,n], bias=b, f=false, rfftplanner=LogNormalGalaxies.plan_with_fftw)
+        x⃗, Ψ = simulate_galaxies(nbar, [L,L,L], pk; nmesh=[n,n,n], bias=b, f=true, rfftplanner=LogNormalGalaxies.plan_with_fftw)
+    end
+
+
     @testset "Reproducible catalog, rsd=$rsd" for rsd=[false,true]
         nbar = 1e-8
         L = 1e3
