@@ -114,6 +114,7 @@ end
 ################## scale by P(k) ############################
 
 function scale_by_pk!(deltak, pk::Union{Function,Spline1D}, bias, kF, Volume)
+    println("  Calculating normal pkG...")
     @time kGg, pkG = pk_to_pkG(k -> bias^2 * pk(k))
     @time multiply_by_pk!(deltak, pkG, kF, Volume)
     return deltak
@@ -131,6 +132,12 @@ function multiply_by_pk!(deltak, pkfn, kF::Tuple, Volume)
 end
 
 multiply_by_pk!(deltak, pkfn, kF, Volume) = multiply_by_pk!(deltak, pkfn, (kF...,), Volume)
+
+
+function scale_by_pk!(deltak, pk::AbstractArray{T,3}, bias, _, Volume) where {T<:Number}
+    println("  Assuming `pk` is normal field power.")
+    @time @strided @. deltak *= √(pk * bias^2 * Volume)
+end
 
 
 ################## calc velocities ###########################

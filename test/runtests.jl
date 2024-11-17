@@ -148,10 +148,28 @@ using BenchmarkTools
         k, pkG = LogNormalGalaxies.pk_to_pkG(pk)
 
         nbar = 3e-4
-        L = 1000.0
+        L = 100.0
         n = 64
         b = 1.0
         f = 1
+        x⃗, Ψ = simulate_galaxies(nbar, L, pk; nmesh=n, bias=b, f=1, rfftplanner=LogNormalGalaxies.plan_with_fftw)
+        x⃗, Ψ = simulate_galaxies(nbar, L, pk; nmesh=n, bias=b, f=false, rfftplanner=LogNormalGalaxies.plan_with_fftw)
+        x⃗, Ψ = simulate_galaxies(nbar, [L,L,L], pk; nmesh=[n,n,n], bias=b, f=false, rfftplanner=LogNormalGalaxies.plan_with_fftw)
+        x⃗, Ψ = simulate_galaxies(nbar, [L,L,L], pk; nmesh=[n,n,n], bias=b, f=true, rfftplanner=LogNormalGalaxies.plan_with_fftw)
+    end
+
+
+    @testset "Array pk" begin
+        println("Test array typed pk:")
+        nbar = 3e-4
+        L = 100.0
+        n = 64
+        b = 1.5
+        f = 1
+
+        pk = rand(n ÷ 2 + 1, n, n)
+        @show typeof(pk)
+
         x⃗, Ψ = simulate_galaxies(nbar, L, pk; nmesh=n, bias=b, f=1, rfftplanner=LogNormalGalaxies.plan_with_fftw)
         x⃗, Ψ = simulate_galaxies(nbar, L, pk; nmesh=n, bias=b, f=false, rfftplanner=LogNormalGalaxies.plan_with_fftw)
         x⃗, Ψ = simulate_galaxies(nbar, [L,L,L], pk; nmesh=[n,n,n], bias=b, f=false, rfftplanner=LogNormalGalaxies.plan_with_fftw)
