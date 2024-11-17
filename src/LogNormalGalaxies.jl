@@ -192,7 +192,7 @@ calc_velocity_component!(deltak, kF, coord) = calc_velocity_component!(deltak, (
 ##################### draw galaxies ###########################
 function draw_galaxies_with_velocities(deltar, vx, vy, vz, Navg, Ngalaxies, Δx,
         ::Val{do_rsd}, ::Val{voxel_window_power}, ::Val{velocity_assignment};
-        rng=Random.GLOBAL_RNG) where {do_rsd,voxel_window_power,velocity_assignment}
+        rng=Random.GLOBAL_RNG, minimize_variance=false) where {do_rsd,voxel_window_power,velocity_assignment}
     T = Float64
 
     xyzv = fill(T(0), 6 * ceil(Int, Ngalaxies + 3 * √Ngalaxies))  # mean + 3 * stddev
@@ -211,7 +211,17 @@ function draw_galaxies_with_velocities(deltar, vx, vy, vz, Navg, Ngalaxies, Δx,
         jg = localrange[2][j]  # global index of local index j
         kg = localrange[3][k]  # global index of local index k
 
-        Nthiscell = pois_rand(rng, (1 + deltar[i,j,k]) * Navg)
+        if minimize_variance
+            Nmean_thiscell = (1 + deltar[i,j,k]) * Navg
+            Nthiscell = floor(Int, Nmean_thiscell)
+            dN = Nmean_thiscell - Nthiscell
+            if rand(rng) > 1 - dN
+                Nthiscell += 1
+            end
+        else
+            # standard Poisson sampling
+            Nthiscell = pois_rand(rng, (1 + deltar[i,j,k]) * Navg)
+        end
 
         g0 = 6 * Ngalaxies_local_actual  # g0 is the index in the xyzv 1D-array
         if g0 + 6 * Nthiscell > length(xyzv)
@@ -468,7 +478,7 @@ end
 # their interface.
 
 # simulate galaxies
-function simulate_galaxies(nxyz, Lxyz, nbar, pk, b, faH; rfftplan=default_plan(nxyz), rng=Random.GLOBAL_RNG, voxel_window_power=1, velocity_assignment=1, win=1, sigma_psi=0.0, fixed=false, gather=true)
+function simulate_galaxies(nxyz, Lxyz, nbar, pk, b, faH; rfftplan=default_plan(nxyz), rng=Random.GLOBAL_RNG, voxel_window_power=1, velocity_assignment=1, win=1, sigma_psi=0.0, fixed=false, gather=true, minimize_variance=false)
     nx, ny, nz = nxyz
     Lx, Ly, Lz = Lxyz
     Volume = Lx * Ly * Lz
@@ -566,7 +576,7 @@ function simulate_galaxies(nxyz, Lxyz, nbar, pk, b, faH; rfftplan=default_plan(n
     Ncells = prod(size_global(deltarg))
     Navg = nbar * prod(Δx)
     Ngalaxies = Navg * Ncells * mean_global(win)
-    @time xyzv = draw_galaxies_with_velocities(deltarg, vx, vy, vz, Navg, Ngalaxies, Δx, Val(do_rsd), Val(voxel_window_power), Val(velocity_assignment); rng)
+    @time xyzv = draw_galaxies_with_velocities(deltarg, vx, vy, vz, Navg, Ngalaxies, Δx, Val(do_rsd), Val(voxel_window_power), Val(velocity_assignment); rng, minimize_variance)
 
     # FoG: sigma_u = f * sigma_psi
     if sigma_psi != 0
@@ -591,13 +601,13 @@ end
 @doc raw"""
     simulate_galaxies(nbar, Lbox, pk; nmesh=256, bias=1.0, f=false,
         rfftplanner=default_plan, rng=Random.GLOBAL_RNG, voxel_window_power=1,
-        velocity_assignment=1, win=1, sigma_psi=0.0, fixed=false, gather=true)
+        velocity_assignment=1, win=1, sigma_psi=0.0, fixed=false, gather=true,
+        minimize_variance=false)
 
 Simulate galaxies using log-normal statistics.
 """
 function simulate_galaxies(nbar, Lbox, pk; nmesh=256, bias=1.0, f=false,
-        rfftplanner=default_plan, rng=Random.GLOBAL_RNG, voxel_window_power=1,
-        velocity_assignment=1, win=1, sigma_psi=0.0, fixed=false, gather=true)
+        rfftplanner=default_plan, kwargs...)
 
     if nmesh isa Number
         nxyz = nmesh, nmesh, nmesh
@@ -618,9 +628,7 @@ function simulate_galaxies(nbar, Lbox, pk; nmesh=256, bias=1.0, f=false,
     end
 
     @time xyzv = simulate_galaxies(nxyz, Lxyz, nbar, pk, bias, f;
-                                   rfftplan, rng, voxel_window_power,
-                                   velocity_assignment, sigma_psi, win,
-                                   fixed, gather)
+                                   rfftplan, kwargs...)
     println("Post-processing...")
     @time xyz = @. xyzv[1:3,:] - Lbox / 2
     @time v = xyzv[4:6,:]
