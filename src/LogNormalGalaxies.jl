@@ -111,6 +111,15 @@ function draw_phases(rfftplan; rng=Random.GLOBAL_RNG)
 end
 
 
+################## scale by P(k) ############################
+
+function scale_by_pk!(deltak, pk::Union{Function,Spline1D}, bias, kF, Volume)
+    @time kGg, pkG = pk_to_pkG(k -> bias^2 * pk(k))
+    @time multiply_by_pk!(deltak, pkG, kF, Volume)
+    return deltak
+end
+
+
 function multiply_by_pk!(deltak, pkfn, kF::Tuple, Volume)
     iterate_kspace(deltak; usethreads=false) do ijk_local,ijk_global
         kx, ky, kz = kF .* ijk_global
@@ -123,6 +132,8 @@ end
 
 multiply_by_pk!(deltak, pkfn, kF, Volume) = multiply_by_pk!(deltak, pkfn, (kF...,), Volume)
 
+
+################## calc velocities ###########################
 
 function calc_velocity_component!(deltak, kF::Tuple, coord)
     iterate_kspace(deltak; usethreads=true) do ijk_local,ijk_global
@@ -427,10 +438,6 @@ function simulate_galaxies(nxyz, Lxyz, nbar, pk, b, faH; rfftplan=default_plan(n
     Δx = Lxyz ./ nxyz
     kF = 2*π ./ Lxyz
 
-    println("Convert pk to log-normal pkG...")
-    @time kGm, pkGm = pk_to_pkG(pk)
-    @time kGg, pkGg = pk_to_pkG(k -> b^2 * pk(k))
-
     println("Draw random phases...")
     @time deltakm = draw_phases(rfftplan; rng)
     if fixed
@@ -439,8 +446,8 @@ function simulate_galaxies(nxyz, Lxyz, nbar, pk, b, faH; rfftplan=default_plan(n
 
     println("Calculate deltak{m,g}...")
     @time deltakg = deepcopy(deltakm)
-    @time multiply_by_pk!(deltakg, pkGg, kF, Volume)
-    @time multiply_by_pk!(deltakm, pkGm, kF, Volume)
+    scale_by_pk!(deltakm, pk, 1, kF, Volume)
+    scale_by_pk!(deltakg, pk, b, kF, Volume)
     #@time pixel_window!(deltakm, nxyz; voxel_window_power)
     #@time pixel_window!(deltakg, nxyz; voxel_window_power)
 
