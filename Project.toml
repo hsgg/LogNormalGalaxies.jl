@@ -38,7 +38,8 @@ MeasurePowerSpectra = "74159778-d4a3-4c31-b0f7-baeaee79979b"
 PlaneParallelRedshiftSpaceDistortions = "69942907-cdcb-4e72-88f5-c4156138b8a7"
 PythonPlot = "274fc56d-3b97-40fa-a1cd-1b4a50311bf9"
 Revise = "295af30f-e4ad-537b-8983-00126c2a3abe"
+StableRNGs = "860ef19b-820b-49d6-a774-d7a799459cd3"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["BenchmarkTools", "DelimitedFiles", "MeasurePowerSpectra", "PlaneParallelRedshiftSpaceDistortions", "PythonPlot", "Revise", "Test"]
+test = ["BenchmarkTools", "DelimitedFiles", "MeasurePowerSpectra", "PlaneParallelRedshiftSpaceDistortions", "PythonPlot", "Revise", "StableRNGs", "Test"]
