@@ -27,6 +27,7 @@ using TwoFAST
 using Random
 using Strided
 using LinearAlgebra
+using Jacobi: legendre
 
 
 using Splines
@@ -137,6 +138,29 @@ multiply_by_pk!(deltak, pkfn, kF, Volume) = multiply_by_pk!(deltak, pkfn, (kF...
 function scale_by_pk!(deltak, pk::AbstractArray{T,3}, bias, _, Volume) where {T<:Number}
     println("  Assuming `pk` is normal field power.")
     @time @strided @. deltak *= √(pk * bias^2 * Volume)
+end
+
+
+# A two-dimensional array is interpreted as pk[k,ell] multipole values.
+# Thus, we expand
+#
+#   pk(kx,ky,kz) = sum_l P_l(k) * L_l(mu)
+#
+# Note that the first dimension must be larger than just n ÷ 2 + 1 so that the
+# corners of the box can be filled.
+function scale_by_pk!(deltak, pk::AbstractArray{T,2}, bias, _, Volume) where {T<:Number}
+    println("  Assuming `pk` is normal field power multipoles.")
+    lmax = size(pk, 2) - 1
+    deltak_0 = deltak[1,1,1]
+    @time iterate_kspace(deltak; usethreads=true) do ijk_local, ijk_global
+        n = norm(ijk_global)
+        mu = eltype(deltak)(ijk_global[3] / n)
+        k = round(Int, n) + 1
+        p = sum(pk[k,ell+1] * legendre(mu, ell) for ell in 0:lmax)
+        deltak[ijk_local...] *= √(p * bias^2 * Volume)
+    end
+    deltak[1,1,1] = deltak_0 * √(pk[1,1] * bias^2 * Volume)
+    return deltak
 end
 
 

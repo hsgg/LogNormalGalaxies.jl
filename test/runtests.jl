@@ -29,7 +29,7 @@ using BenchmarkTools
         pk(k) = D^2 * _pk(k)
 
         nbar = 3e-4
-        L = 2e3
+        L = 1e2
         ΔL = 50.0  # buffer for RSD
         n = 64
         #Random.seed!(8143083339)
@@ -89,7 +89,7 @@ using BenchmarkTools
         @test pkG(0.1) == 0
 
         nbar = 3e-4
-        L = 1000.0
+        L = 100.0
         n = 64
         b = 1.0
         f = 1
@@ -114,7 +114,7 @@ using BenchmarkTools
         vx = randn(nnn...) / 10
         vy = randn(nnn...) / 10
         vz = randn(nnn...) / 10
-        Ngalaxies = 1_000_000
+        Ngalaxies = 100_000
         Δx = [1.0, 1.0, 1.0]
         Navg = Ngalaxies / prod(nnn)
         @time xyzv = LogNormalGalaxies.draw_galaxies_with_velocities(deltar, vx, vy, vz, Navg, Ngalaxies, Δx, Val(true), Val(2), Val(6))
@@ -159,7 +159,7 @@ using BenchmarkTools
     end
 
 
-    @testset "Array pk" begin
+    @testset "3D-Array pk" begin
         println("Test array typed pk:")
         nbar = 3e-4
         L = 100.0
@@ -168,6 +168,25 @@ using BenchmarkTools
         f = 1
 
         pk = rand(n ÷ 2 + 1, n, n)
+        @show typeof(pk)
+
+        x⃗, Ψ = simulate_galaxies(nbar, L, pk; nmesh=n, bias=b, f=1, rfftplanner=LogNormalGalaxies.plan_with_fftw)
+        x⃗, Ψ = simulate_galaxies(nbar, L, pk; nmesh=n, bias=b, f=false, rfftplanner=LogNormalGalaxies.plan_with_fftw)
+        x⃗, Ψ = simulate_galaxies(nbar, [L,L,L], pk; nmesh=[n,n,n], bias=b, f=false, rfftplanner=LogNormalGalaxies.plan_with_fftw)
+        x⃗, Ψ = simulate_galaxies(nbar, [L,L,L], pk; nmesh=[n,n,n], bias=b, f=true, rfftplanner=LogNormalGalaxies.plan_with_fftw)
+    end
+
+
+    @testset "2D-Array pk" begin
+        println("Test array typed pk:")
+        nbar = 3e-4
+        L = 100.0
+        n = 64
+        b = 1.5
+        f = 1
+        lmax = 4
+
+        pk = rand(n, lmax + 1)
         @show typeof(pk)
 
         x⃗, Ψ = simulate_galaxies(nbar, L, pk; nmesh=n, bias=b, f=1, rfftplanner=LogNormalGalaxies.plan_with_fftw)
