@@ -5,6 +5,7 @@ version = "0.7.6"
 
 [deps]
 FFTW = "7a1cc6ca-52ef-59f5-83cd-3a7055c09341"
+Jacobi = "83f21c0b-4282-5fbc-9e3f-f6da3d2e584c"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 MPI = "da04e1cc-30fd-572f-bb4f-1f8673147195"
 PencilFFTs = "4a48f351-57a6-4416-9ec4-c37015456aae"
@@ -20,6 +21,7 @@ TwoFAST = "0dd23c3e-f403-11e8-3e11-4dddf690af97"
 
 [compat]
 FFTW = "1"
+Jacobi = "0.7.0"
 MPI = "0.20"
 PencilFFTs = "0.14, 0.15"
 PoissonRandom = "0.4"

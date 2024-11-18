@@ -27,6 +27,7 @@ using TwoFAST
 using Random
 using Strided
 using LinearAlgebra
+using Jacobi: legendre
 
 
 using Splines
@@ -111,6 +112,16 @@ function draw_phases(rfftplan; rng=Random.GLOBAL_RNG)
 end
 
 
+################## scale by P(k) ############################
+
+function scale_by_pk!(deltak, pk::Union{Function,Spline1D}, bias, kF, Volume)
+    println("  Calculating normal pkG...")
+    @time kGg, pkG = pk_to_pkG(k -> bias^2 * pk(k))
+    @time multiply_by_pk!(deltak, pkG, kF, Volume)
+    return deltak
+end
+
+
 function multiply_by_pk!(deltak, pkfn, kF::Tuple, Volume)
     iterate_kspace(deltak; usethreads=false) do ijk_local,ijk_global
         kx, ky, kz = kF .* ijk_global
@@ -123,6 +134,43 @@ end
 
 multiply_by_pk!(deltak, pkfn, kF, Volume) = multiply_by_pk!(deltak, pkfn, (kF...,), Volume)
 
+
+function scale_by_pk!(deltak, pk::AbstractArray{T,3}, bias, _, Volume) where {T<:Number}
+    println("  Assuming `pk` is normal field power.")
+    @time @strided @. deltak *= √(pk * bias^2 * Volume)
+end
+
+
+# A two-dimensional array is interpreted as pk[k,ell] multipole values.
+# Thus, we expand
+#
+#   pk(kx,ky,kz) = sum_l P_l(k) * L_l(mu)
+#
+# Note that the first dimension must be larger than just n ÷ 2 + 1 so that the
+# corners of the box can be filled.
+function scale_by_pk!(deltak, pk::AbstractArray{T,2}, bias, _, Volume) where {T<:Number}
+    println("  Assuming `pk` is normal field power multipoles.")
+    lmax = size(pk, 2) - 1
+    deltak_0 = deltak[1,1,1]
+    @time iterate_kspace(deltak; usethreads=true) do ijk_local, ijk_global
+        n = norm(ijk_global)
+        mu = eltype(deltak)(ijk_global[3] / n)
+        k = round(Int, n) + 1
+        p = sum(pk[k,ell+1] * legendre(mu, ell) for ell in 0:lmax)
+        deltak[ijk_local...] *= √(p * bias^2 * Volume)
+    end
+    deltak[1,1,1] = deltak_0 * √(pk[1,1] * bias^2 * Volume)
+    return deltak
+end
+
+
+function scale_by_pk!(deltak, pk::AbstractArray{T,1}, bias, _, Volume) where {T<:Number}
+    # reduce to 2D-array case with only a monopole:
+    scale_by_pk!(deltak, pk[:,:], bias, nothing, Volume)
+end
+
+
+################## calc velocities ###########################
 
 function calc_velocity_component!(deltak, kF::Tuple, coord)
     iterate_kspace(deltak; usethreads=true) do ijk_local,ijk_global
@@ -144,7 +192,7 @@ calc_velocity_component!(deltak, kF, coord) = calc_velocity_component!(deltak, (
 ##################### draw galaxies ###########################
 function draw_galaxies_with_velocities(deltar, vx, vy, vz, Navg, Ngalaxies, Δx,
         ::Val{do_rsd}, ::Val{voxel_window_power}, ::Val{velocity_assignment};
-        rng=Random.GLOBAL_RNG) where {do_rsd,voxel_window_power,velocity_assignment}
+        rng=Random.GLOBAL_RNG, minimize_variance=false) where {do_rsd,voxel_window_power,velocity_assignment}
     T = Float64
 
     xyzv = fill(T(0), 6 * ceil(Int, Ngalaxies + 3 * √Ngalaxies))  # mean + 3 * stddev
@@ -163,7 +211,17 @@ function draw_galaxies_with_velocities(deltar, vx, vy, vz, Navg, Ngalaxies, Δx,
         jg = localrange[2][j]  # global index of local index j
         kg = localrange[3][k]  # global index of local index k
 
-        Nthiscell = pois_rand(rng, (1 + deltar[i,j,k]) * Navg)
+        if minimize_variance
+            Nmean_thiscell = (1 + deltar[i,j,k]) * Navg
+            Nthiscell = floor(Int, Nmean_thiscell)
+            dN = Nmean_thiscell - Nthiscell
+            if rand(rng) > 1 - dN
+                Nthiscell += 1
+            end
+        else
+            # standard Poisson sampling
+            Nthiscell = pois_rand(rng, (1 + deltar[i,j,k]) * Navg)
+        end
 
         g0 = 6 * Ngalaxies_local_actual  # g0 is the index in the xyzv 1D-array
         if g0 + 6 * Nthiscell > length(xyzv)
@@ -420,16 +478,12 @@ end
 # their interface.
 
 # simulate galaxies
-function simulate_galaxies(nxyz, Lxyz, nbar, pk, b, faH; rfftplan=default_plan(nxyz), rng=Random.GLOBAL_RNG, voxel_window_power=1, velocity_assignment=1, win=1, sigma_psi=0.0, fixed=false, gather=true)
+function simulate_galaxies(nxyz, Lxyz, nbar, pk, b, faH; rfftplan=default_plan(nxyz), rng=Random.GLOBAL_RNG, voxel_window_power=1, velocity_assignment=1, win=1, sigma_psi=0.0, fixed=false, gather=true, minimize_variance=false)
     nx, ny, nz = nxyz
     Lx, Ly, Lz = Lxyz
     Volume = Lx * Ly * Lz
     Δx = Lxyz ./ nxyz
     kF = 2*π ./ Lxyz
-
-    println("Convert pk to log-normal pkG...")
-    @time kGm, pkGm = pk_to_pkG(pk)
-    @time kGg, pkGg = pk_to_pkG(k -> b^2 * pk(k))
 
     println("Draw random phases...")
     @time deltakm = draw_phases(rfftplan; rng)
@@ -439,8 +493,8 @@ function simulate_galaxies(nxyz, Lxyz, nbar, pk, b, faH; rfftplan=default_plan(n
 
     println("Calculate deltak{m,g}...")
     @time deltakg = deepcopy(deltakm)
-    @time multiply_by_pk!(deltakg, pkGg, kF, Volume)
-    @time multiply_by_pk!(deltakm, pkGm, kF, Volume)
+    scale_by_pk!(deltakm, pk, 1, kF, Volume)
+    scale_by_pk!(deltakg, pk, b, kF, Volume)
     #@time pixel_window!(deltakm, nxyz; voxel_window_power)
     #@time pixel_window!(deltakg, nxyz; voxel_window_power)
 
@@ -522,7 +576,7 @@ function simulate_galaxies(nxyz, Lxyz, nbar, pk, b, faH; rfftplan=default_plan(n
     Ncells = prod(size_global(deltarg))
     Navg = nbar * prod(Δx)
     Ngalaxies = Navg * Ncells * mean_global(win)
-    @time xyzv = draw_galaxies_with_velocities(deltarg, vx, vy, vz, Navg, Ngalaxies, Δx, Val(do_rsd), Val(voxel_window_power), Val(velocity_assignment); rng)
+    @time xyzv = draw_galaxies_with_velocities(deltarg, vx, vy, vz, Navg, Ngalaxies, Δx, Val(do_rsd), Val(voxel_window_power), Val(velocity_assignment); rng, minimize_variance)
 
     # FoG: sigma_u = f * sigma_psi
     if sigma_psi != 0
@@ -547,13 +601,13 @@ end
 @doc raw"""
     simulate_galaxies(nbar, Lbox, pk; nmesh=256, bias=1.0, f=false,
         rfftplanner=default_plan, rng=Random.GLOBAL_RNG, voxel_window_power=1,
-        velocity_assignment=1, win=1, sigma_psi=0.0, fixed=false, gather=true)
+        velocity_assignment=1, win=1, sigma_psi=0.0, fixed=false, gather=true,
+        minimize_variance=false)
 
 Simulate galaxies using log-normal statistics.
 """
 function simulate_galaxies(nbar, Lbox, pk; nmesh=256, bias=1.0, f=false,
-        rfftplanner=default_plan, rng=Random.GLOBAL_RNG, voxel_window_power=1,
-        velocity_assignment=1, win=1, sigma_psi=0.0, fixed=false, gather=true)
+        rfftplanner=default_plan, kwargs...)
 
     if nmesh isa Number
         nxyz = nmesh, nmesh, nmesh
@@ -574,9 +628,7 @@ function simulate_galaxies(nbar, Lbox, pk; nmesh=256, bias=1.0, f=false,
     end
 
     @time xyzv = simulate_galaxies(nxyz, Lxyz, nbar, pk, bias, f;
-                                   rfftplan, rng, voxel_window_power,
-                                   velocity_assignment, sigma_psi, win,
-                                   fixed, gather)
+                                   rfftplan, kwargs...)
     println("Post-processing...")
     @time xyz = @. xyzv[1:3,:] - Lbox / 2
     @time v = xyzv[4:6,:]
