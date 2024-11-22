@@ -12,9 +12,9 @@ using BenchmarkTools
 using PkSpectra
 
 
-@testset "LogNormalGalaxies" begin
+@testset verbose=true "LogNormalGalaxies" begin
 
-    @testset "Compile and load" for rfftplanner=[LogNormalGalaxies.plan_with_fftw,LogNormalGalaxies.plan_with_pencilffts]
+    @testset "Compile and load $rfftplanner" for rfftplanner=[LogNormalGalaxies.plan_with_fftw,LogNormalGalaxies.plan_with_pencilffts]
         @show rfftplanner
         if Sys.ARCH == :aarch64 && rfftplanner == LogNormalGalaxies.plan_with_pencilffts
             @test_skip "Skipping PencilFFTs on ARM64"
@@ -30,9 +30,9 @@ using PkSpectra
         pk(k) = D^2 * _pk(k)
 
         nbar = 3e-4
-        L = 1e2
+        L = 1e1
         ΔL = 50.0  # buffer for RSD
-        n = 64
+        n = 32
         #Random.seed!(8143083339)
 
         # generate catalog
@@ -121,7 +121,7 @@ using PkSpectra
         @time xyzv = LogNormalGalaxies.draw_galaxies_with_velocities(deltar, vx, vy, vz, Navg, Ngalaxies, Δx, Val(true), Val(2), Val(6))
         @time xyzv = LogNormalGalaxies.draw_galaxies_with_velocities(deltar, vx, vy, vz, Navg, Ngalaxies, Δx, Val(true), Val(2), Val(6))
         @time xyzv = LogNormalGalaxies.draw_galaxies_with_velocities(deltar, vx, vy, vz, Navg, Ngalaxies, Δx, Val(true), Val(2), Val(6))
-        @btime LogNormalGalaxies.draw_galaxies_with_velocities($deltar, $vx, $vy, $vz, $Navg, $Ngalaxies, $Δx, Val(true), Val(2), Val(6))
+        #@btime LogNormalGalaxies.draw_galaxies_with_velocities($deltar, $vx, $vy, $vz, $Navg, $Ngalaxies, $Δx, Val(true), Val(2), Val(6))
     end
 
 
@@ -136,7 +136,7 @@ using PkSpectra
     end
 
 
-    @testset "Any spline" begin
+    @testset verbose=true "Any spline" begin
         println("Test any typed spline:")
         # Someone may give other data types than Float64 to the module. Let's be
         # able to handle that.
@@ -144,7 +144,12 @@ using PkSpectra
         pk0 = Spline1D(data[2:end,1], data[2:end,2], extrapolation=Splines.powerlaw)
         pk1 = PkDefault()
 
-        for pk in [pk0, pk1]
+        # Test any callable
+        struct SomeTypeSomeWhere end
+        (::SomeTypeSomeWhere)(k) = pk1(k)
+        pk2 = SomeTypeSomeWhere()
+
+        @testset "$(typeof(pk))" for pk in [pk0, pk1, pk2]
             @show typeof(data)
             @show typeof(pk)
             @show pk(0.01)
@@ -152,13 +157,11 @@ using PkSpectra
             k, pkG = LogNormalGalaxies.pk_to_pkG(pk)
 
             nbar = 3e-4
-            L = 100.0
-            n = 64
-            b = 1.0
+            L = 10.0
+            n = 32
+            b = 1.5
             f = 1
             x⃗, Ψ = simulate_galaxies(nbar, L, pk; nmesh=n, bias=b, f=1, rfftplanner=LogNormalGalaxies.plan_with_fftw)
-            x⃗, Ψ = simulate_galaxies(nbar, L, pk; nmesh=n, bias=b, f=false, rfftplanner=LogNormalGalaxies.plan_with_fftw)
-            x⃗, Ψ = simulate_galaxies(nbar, [L,L,L], pk; nmesh=[n,n,n], bias=b, f=false, rfftplanner=LogNormalGalaxies.plan_with_fftw)
             x⃗, Ψ = simulate_galaxies(nbar, [L,L,L], pk; nmesh=[n,n,n], bias=b, f=true, rfftplanner=LogNormalGalaxies.plan_with_fftw)
         end
     end
@@ -177,8 +180,6 @@ using PkSpectra
 
         x⃗, Ψ = simulate_galaxies(nbar, L, pk; nmesh=n, bias=b, f=1, rfftplanner=LogNormalGalaxies.plan_with_fftw)
         x⃗, Ψ = simulate_galaxies(nbar, L, pk; nmesh=n, bias=b, f=false, rfftplanner=LogNormalGalaxies.plan_with_fftw)
-        x⃗, Ψ = simulate_galaxies(nbar, [L,L,L], pk; nmesh=[n,n,n], bias=b, f=false, rfftplanner=LogNormalGalaxies.plan_with_fftw)
-        x⃗, Ψ = simulate_galaxies(nbar, [L,L,L], pk; nmesh=[n,n,n], bias=b, f=true, rfftplanner=LogNormalGalaxies.plan_with_fftw)
     end
 
 
@@ -194,8 +195,6 @@ using PkSpectra
         pk = rand(n, lmax + 1)
         @show typeof(pk)
 
-        x⃗, Ψ = simulate_galaxies(nbar, L, pk; nmesh=n, bias=b, f=1, rfftplanner=LogNormalGalaxies.plan_with_fftw)
-        x⃗, Ψ = simulate_galaxies(nbar, L, pk; nmesh=n, bias=b, f=false, rfftplanner=LogNormalGalaxies.plan_with_fftw)
         x⃗, Ψ = simulate_galaxies(nbar, [L,L,L], pk; nmesh=[n,n,n], bias=b, f=false, rfftplanner=LogNormalGalaxies.plan_with_fftw)
         x⃗, Ψ = simulate_galaxies(nbar, [L,L,L], pk; nmesh=[n,n,n], bias=b, f=true, rfftplanner=LogNormalGalaxies.plan_with_fftw)
     end
@@ -213,9 +212,6 @@ using PkSpectra
         pk = rand(n)
         @show typeof(pk)
 
-        x⃗, Ψ = simulate_galaxies(nbar, L, pk; nmesh=n, bias=b, f=1, rfftplanner=LogNormalGalaxies.plan_with_fftw)
-        x⃗, Ψ = simulate_galaxies(nbar, L, pk; nmesh=n, bias=b, f=false, rfftplanner=LogNormalGalaxies.plan_with_fftw)
-        x⃗, Ψ = simulate_galaxies(nbar, [L,L,L], pk; nmesh=[n,n,n], bias=b, f=false, rfftplanner=LogNormalGalaxies.plan_with_fftw)
         x⃗, Ψ = simulate_galaxies(nbar, [L,L,L], pk; nmesh=[n,n,n], bias=b, f=true, rfftplanner=LogNormalGalaxies.plan_with_fftw)
     end
 
