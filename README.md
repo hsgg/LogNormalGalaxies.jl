@@ -1,8 +1,12 @@
 # LogNormalGalaxies.jl
 
 
-This Julia package implements a simple log-normal galaxies simulation, similar
-to as explained in [Agrawal etal (2017)](https://arxiv.org/abs/1706.09195).
+This Julia package implements a simple log-normal galaxies simulation,
+described in Section IV of [Benabou, Sands et al.
+(2024)](https://arxiv.org/abs/2404.04811). It is heavily inspired by the
+[log_normal_galaxies](https://bitbucket.org/komatsu5147/lognormal_galaxies/src/master/)
+code introduced in [Agrawal et al. (2017)](https://arxiv.org/abs/1706.09195),
+where more details on log-normal simulations in general can be found.
 
 
 ## Installation
@@ -63,3 +67,15 @@ desired, and, after applying RSD, cut it down to the desired size. This is
 because RSD will always leave a region near the edges of the box incomplete as
 galaxies get scattered outside the box, but no galaxies get scattered inside
 the box.
+
+
+## List of Papers
+
+This is a list of papers using this code:
+
+1. [Grasshorn Gebhardt & Jeong (2020)](https://arxiv.org/abs/2008.08706): $C_\ell$ bins and RSD with FoG
+2. [Grasshorn Gebhardt & Doré (2021)](https://arxiv.org/abs/2102.10079): [SuperFaB](https://github.com/hsgg/SphericalFourierBesselDecompositions.jl)
+3. [Grasshorn Gebhardt & Doré (2021)](https://arxiv.org/abs/2109.13352): [CryoFunk/CryoFaBs.jl](https://github.com/hsgg/CryoFaBs.jl)
+4. [Grasshorn Gebhardt & Doré (2024)](https://arxiv.org/abs/2310.17677): SuperFaB Validation on eBOSS
+5. [Benabou & Sands *etal.* (2024)](https://arxiv.org/abs/2404.04811): Perturbative Wide-Angle effects in PS
+6. [Wen *etal.* (2024)](https://arxiv.org/abs/2404.04812): Nonperturbative Wide-Angle effects in PS

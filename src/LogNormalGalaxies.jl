@@ -27,6 +27,7 @@ using TwoFAST
 using Random
 using Strided
 using LinearAlgebra
+using Jacobi: legendre
 
 
 using Splines
@@ -41,6 +42,7 @@ j0(x) = sinc(x/π)  # this function is used in multiple locations
 # intra-module include files
 include("pk_to_pkG.jl")
 include("arrays.jl")
+include("mpi.jl")
 include("LinearInterpolations.jl")
 include("apply_rsd.jl")
 
@@ -110,61 +112,76 @@ function draw_phases(rfftplan; rng=Random.GLOBAL_RNG)
 end
 
 
-function calc_global_indices(ijk_local, localrange, nx2, ny2, nz2, nx, ny, nz; wrap)
-    ig = localrange[1][ijk_local[1]] - 1  # global index of local index i
-    jg = localrange[2][ijk_local[2]] - 1  # global index of local index j
-    kg = localrange[3][ijk_local[3]] - 1  # global index of local index k
-    if wrap
-        ig = ig < nx2 ? ig : ig-nx
-        jg = jg < ny2 ? jg : jg-ny
-        kg = kg < nz2 ? kg : kg-nz
-    end
-    return ig, jg, kg
-end
+################## scale by P(k) ############################
 
+function scale_by_pk!(deltak, pk, bias, kF, Volume; rfftplan)
+    println("  Calculating normal pkG via TwoFast...")
+    @time kGg, pkG = pk_to_pkG(k -> bias^2 * pk(k))
 
-function iterate_kspace(func, deltak; usethreads=false, first_half_dimension=true, wrap=true)
-    nx, ny, nz = size_global(deltak)
-    nx2 = first_half_dimension ? nx : (div(nx,2) + 1)
-    ny2 = div(ny,2) + 1
-    nz2 = div(nz,2) + 1
-    localrange = range_local(deltak)
-
-    if usethreads
-        Threads.@threads for k=1:size(deltak,3)
-            for j=1:size(deltak,2), i=1:size(deltak,1)
-                ijk_local = (i, j, k)
-                ijk_global = calc_global_indices(ijk_local, localrange, nx2, ny2, nz2, nx, ny, nz; wrap)
-                func(ijk_local, ijk_global)
-            end
-        end
-    else
-        for k=1:size(deltak,3), j=1:size(deltak,2), i=1:size(deltak,1)
-            ijk_local = (i, j, k)
-            ijk_global = calc_global_indices(ijk_local, localrange, nx2, ny2, nz2, nx, ny, nz; wrap)
-            func(ijk_local, ijk_global)
-        end
-    end
-
-    return deltak
-end
-
-# The index (1,1,1) maps to x⃑ = (0,0,0).
-iterate_rspace(args...; kwargs...) = iterate_kspace(args...; first_half_dimension=false, wrap=false, kwargs...)
-
-
-function multiply_by_pk!(deltak, pkfn, kF::Tuple, Volume)
-    iterate_kspace(deltak; usethreads=false) do ijk_local,ijk_global
+    @time iterate_kspace(deltak; usethreads=false) do ijk_local,ijk_global
         kx, ky, kz = kF .* ijk_global
+
         kmode = √(kx^2 + ky^2 + kz^2)
-        pk = pkfn(kmode)  # not thread-safe
+
+        pk = pkG(kmode)  # not thread-safe
+
         deltak[ijk_local...] *= √(pk * Volume)
     end
+
     return deltak
 end
 
-multiply_by_pk!(deltak, pkfn, kF, Volume) = multiply_by_pk!(deltak, pkfn, (kF...,), Volume)
 
+function scale_by_pk!(deltak, pk::AbstractArray{T,3}, bias, kF, Volume; rfftplan) where {T<:Number}
+    println("  Calculating normal pkG via 3D Fourier transform...")
+    @time xi = rfftplan \ pk
+
+    @time @strided @. xi = log1p(bias^2 * xi)  # transform to Gaussian field correlation
+
+    @time pkG = rfftplan * xi
+
+    @time @strided @. deltak *= √(pkG * Volume)
+end
+
+
+# A two-dimensional array is interpreted as pk[k,ell] multipole values.
+# Thus, we expand
+#
+#   pk(kx,ky,kz) = sum_l P_l(k) * L_l(mu)
+#
+# Note that the first dimension must be larger than just n ÷ 2 + 1 so that the
+# corners of the box can be filled.
+function scale_by_pk!(deltak, pk::AbstractArray{T,2}, bias, kF, Volume; rfftplan) where {T<:Number}
+    lmax = size(pk, 2) - 1
+
+    pk3d = similar(deltak)
+
+    @time iterate_kspace(pk3d; usethreads=true) do ijk_local, ijk_global
+        n = norm(ijk_global)
+
+        mu = eltype(pk3d)(ijk_global[3] / n)
+
+        k = round(Int, n) + 1
+
+        p = sum(pk[k,ell+1] * legendre(mu, ell) for ell in 0:lmax)
+
+        pk3d[ijk_local...] = p
+    end
+
+    pk3d[1,1,1] = pk[1,1]
+
+    # Note: bias will be applied here:
+    scale_by_pk!(deltak, pk3d, bias, nothing, Volume; rfftplan)
+end
+
+
+function scale_by_pk!(deltak, pk::AbstractArray{T,1}, bias, kF, Volume; rfftplan) where {T<:Number}
+    # reduce to 2D-array case with only a monopole:
+    scale_by_pk!(deltak, pk[:,:], bias, nothing, Volume; rfftplan)
+end
+
+
+################## calc velocities ###########################
 
 function calc_velocity_component!(deltak, kF::Tuple, coord)
     iterate_kspace(deltak; usethreads=true) do ijk_local,ijk_global
@@ -186,7 +203,7 @@ calc_velocity_component!(deltak, kF, coord) = calc_velocity_component!(deltak, (
 ##################### draw galaxies ###########################
 function draw_galaxies_with_velocities(deltar, vx, vy, vz, Navg, Ngalaxies, Δx,
         ::Val{do_rsd}, ::Val{voxel_window_power}, ::Val{velocity_assignment};
-        rng=Random.GLOBAL_RNG) where {do_rsd,voxel_window_power,velocity_assignment}
+        rng=Random.GLOBAL_RNG, minimize_shotnoise=false) where {do_rsd,voxel_window_power,velocity_assignment}
     T = Float64
 
     xyzv = fill(T(0), 6 * ceil(Int, Ngalaxies + 3 * √Ngalaxies))  # mean + 3 * stddev
@@ -205,7 +222,17 @@ function draw_galaxies_with_velocities(deltar, vx, vy, vz, Navg, Ngalaxies, Δx,
         jg = localrange[2][j]  # global index of local index j
         kg = localrange[3][k]  # global index of local index k
 
-        Nthiscell = pois_rand(rng, (1 + deltar[i,j,k]) * Navg)
+        if minimize_shotnoise
+            Nmean_thiscell = (1 + deltar[i,j,k]) * Navg
+            Nthiscell = floor(Int, Nmean_thiscell)
+            dN = Nmean_thiscell - Nthiscell
+            if rand(rng) > 1 - dN
+                Nthiscell += 1
+            end
+        else
+            # standard Poisson sampling
+            Nthiscell = pois_rand(rng, (1 + deltar[i,j,k]) * Navg)
+        end
 
         g0 = 6 * Ngalaxies_local_actual  # g0 is the index in the xyzv 1D-array
         if g0 + 6 * Nthiscell > length(xyzv)
@@ -462,27 +489,26 @@ end
 # their interface.
 
 # simulate galaxies
-function simulate_galaxies(nxyz, Lxyz, nbar, pk, b, faH; rfftplan=default_plan(nxyz), rng=Random.GLOBAL_RNG, voxel_window_power=1, velocity_assignment=1, win=1, sigma_psi=0.0, fixed=false, gather=true)
+function simulate_galaxies(nxyz, Lxyz, nbar, pk, b, faH; rfftplan=default_plan(nxyz), rng=Random.GLOBAL_RNG, voxel_window_power=1, velocity_assignment=1, win=1, sigma_psi=0.0, phase_shift=0.0, fixed=false, gather=true, minimize_shotnoise=false)
     nx, ny, nz = nxyz
     Lx, Ly, Lz = Lxyz
     Volume = Lx * Ly * Lz
     Δx = Lxyz ./ nxyz
     kF = 2*π ./ Lxyz
 
-    println("Convert pk to log-normal pkG...")
-    @time kGm, pkGm = pk_to_pkG(pk)
-    @time kGg, pkGg = pk_to_pkG(k -> b^2 * pk(k))
-
     println("Draw random phases...")
     @time deltakm = draw_phases(rfftplan; rng)
+    if phase_shift != 0
+        @time @strided deltakm .*= cos(phase_shift) + im * sin(phase_shift)  # exp(im*π) does not specialize for irrational
+    end
     if fixed
         @strided @. deltakm /= abs(deltakm)
     end
 
     println("Calculate deltak{m,g}...")
     @time deltakg = deepcopy(deltakm)
-    @time multiply_by_pk!(deltakg, pkGg, kF, Volume)
-    @time multiply_by_pk!(deltakm, pkGm, kF, Volume)
+    scale_by_pk!(deltakm, pk, 1, (kF...,), Volume; rfftplan)
+    scale_by_pk!(deltakg, pk, b, (kF...,), Volume; rfftplan)
     #@time pixel_window!(deltakm, nxyz; voxel_window_power)
     #@time pixel_window!(deltakg, nxyz; voxel_window_power)
 
@@ -496,27 +522,38 @@ function simulate_galaxies(nxyz, Lxyz, nbar, pk, b, faH; rfftplan=default_plan(n
     #@show get_rank(),deltarm[1,1,1],mean(deltakm)
     #@show get_rank(),deltarg[1,1,1],mean(deltakg)
     deltakg = nothing
-    #@show mean(deltarm),std(deltarm)
-    #@show extrema(deltarm)
-    #@show mean(deltarg),std(deltarg)
-    #@show extrema(deltarg)
+    # @show mean(deltarm),std(deltarm)
+    # @show extrema(deltarm)
+    # @show mean(deltarg),std(deltarg)
+    # @show extrema(deltarg)
 
     println("Transform G → δ...")
-    @time σGm² = var_global(deltarm)
-    @time σGg² = var_global(deltarg)
-    #σGm²_th = calculate_sigmaGsq(pkGm, prod(Lxyz ./ nxyz))
-    #σGg²_th = calculate_sigmaGsq(pkGg, prod(Lxyz ./ nxyz))
-    #@show σGm²,σGm²_th,σGm²/σGm²_th
-    #@show σGg²,σGg²_th,σGg²/σGg²_th
-    #@show var(deltarg)
-    #return
-    @time @strided @. deltarm = exp(deltarm - σGm²/2) - 1
-    @time @strided @. deltarg = exp(deltarg - σGg²/2) - 1
+    # @time σGm² = var_global(deltarm)
+    # @time σGg² = var_global(deltarg)
+    # σGm²_th = calculate_sigmaGsq(pkGm, prod(Lxyz ./ nxyz))
+    # σGg²_th = calculate_sigmaGsq(pkGg, prod(Lxyz ./ nxyz))
+    # @time σGm² = 2 * log(mean_global(@strided exp.(deltarm)))
+    # @time σGg² = 2 * log(mean_global(@strided exp.(deltarg)))
+    # @show σGm²
+    # @show σGg²
+    # @time @strided @. deltarm = exp(deltarm - σGm²/2) - 1
+    # @time @strided @. deltarg = exp(deltarg - σGg²/2) - 1
+
+    # non-allocating version of <e^G>
+    @time @strided @. deltarm = exp(deltarm)
+    @time mean_expGm = 1 / mean_global(deltarm)
+    @time @strided @. deltarm = deltarm * mean_expGm - 1
+
+    # non-allocating version of <e^G>
+    @time @strided @. deltarg = exp(deltarg)
+    @time mean_expGg = 1 / mean_global(deltarg)
+    @time @strided @. deltarg = deltarg * mean_expGg - 1
+
     #@show σGm² σGg²
-    #@show mean(deltarm),std(deltarm)
-    #@show extrema(deltarm)
-    #@show mean(deltarg),std(deltarg)
-    #@show extrema(deltarg)
+    # @show mean(deltarm),std(deltarm)
+    # @show extrema(deltarm)
+    # @show mean(deltarg),std(deltarg)
+    # @show extrema(deltarg)
 
     if faH != 0
         # Note: In this section we ignore the Volume/(nx*ny*nz) multiplication
@@ -564,7 +601,7 @@ function simulate_galaxies(nxyz, Lxyz, nbar, pk, b, faH; rfftplan=default_plan(n
     Ncells = prod(size_global(deltarg))
     Navg = nbar * prod(Δx)
     Ngalaxies = Navg * Ncells * mean_global(win)
-    @time xyzv = draw_galaxies_with_velocities(deltarg, vx, vy, vz, Navg, Ngalaxies, Δx, Val(do_rsd), Val(voxel_window_power), Val(velocity_assignment); rng)
+    @time xyzv = draw_galaxies_with_velocities(deltarg, vx, vy, vz, Navg, Ngalaxies, Δx, Val(do_rsd), Val(voxel_window_power), Val(velocity_assignment); rng, minimize_shotnoise)
 
     # FoG: sigma_u = f * sigma_psi
     if sigma_psi != 0
@@ -589,13 +626,13 @@ end
 @doc raw"""
     simulate_galaxies(nbar, Lbox, pk; nmesh=256, bias=1.0, f=false,
         rfftplanner=default_plan, rng=Random.GLOBAL_RNG, voxel_window_power=1,
-        velocity_assignment=1, win=1, sigma_psi=0.0, fixed=false, gather=true)
+        velocity_assignment=1, win=1, sigma_psi=0.0, phase_shift=0.0,
+        fixed=false, gather=true, minimize_shotnoise=false)
 
 Simulate galaxies using log-normal statistics.
 """
 function simulate_galaxies(nbar, Lbox, pk; nmesh=256, bias=1.0, f=false,
-        rfftplanner=default_plan, rng=Random.GLOBAL_RNG, voxel_window_power=1,
-        velocity_assignment=1, win=1, sigma_psi=0.0, fixed=false, gather=true)
+        rfftplanner=default_plan, kwargs...)
 
     if nmesh isa Number
         nxyz = nmesh, nmesh, nmesh
@@ -616,9 +653,7 @@ function simulate_galaxies(nbar, Lbox, pk; nmesh=256, bias=1.0, f=false,
     end
 
     @time xyzv = simulate_galaxies(nxyz, Lxyz, nbar, pk, bias, f;
-                                   rfftplan, rng, voxel_window_power,
-                                   velocity_assignment, sigma_psi, win,
-                                   fixed, gather)
+                                   rfftplan, kwargs...)
     println("Post-processing...")
     @time xyz = @. xyzv[1:3,:] - Lbox / 2
     @time v = xyzv[4:6,:]
