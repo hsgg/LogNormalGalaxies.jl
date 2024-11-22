@@ -522,27 +522,38 @@ function simulate_galaxies(nxyz, Lxyz, nbar, pk, b, faH; rfftplan=default_plan(n
     #@show get_rank(),deltarm[1,1,1],mean(deltakm)
     #@show get_rank(),deltarg[1,1,1],mean(deltakg)
     deltakg = nothing
-    #@show mean(deltarm),std(deltarm)
-    #@show extrema(deltarm)
-    #@show mean(deltarg),std(deltarg)
-    #@show extrema(deltarg)
+    # @show mean(deltarm),std(deltarm)
+    # @show extrema(deltarm)
+    # @show mean(deltarg),std(deltarg)
+    # @show extrema(deltarg)
 
     println("Transform G → δ...")
-    @time σGm² = var_global(deltarm)
-    @time σGg² = var_global(deltarg)
-    #σGm²_th = calculate_sigmaGsq(pkGm, prod(Lxyz ./ nxyz))
-    #σGg²_th = calculate_sigmaGsq(pkGg, prod(Lxyz ./ nxyz))
-    #@show σGm²,σGm²_th,σGm²/σGm²_th
-    #@show σGg²,σGg²_th,σGg²/σGg²_th
-    #@show var(deltarg)
-    #return
-    @time @strided @. deltarm = exp(deltarm - σGm²/2) - 1
-    @time @strided @. deltarg = exp(deltarg - σGg²/2) - 1
+    # @time σGm² = var_global(deltarm)
+    # @time σGg² = var_global(deltarg)
+    # σGm²_th = calculate_sigmaGsq(pkGm, prod(Lxyz ./ nxyz))
+    # σGg²_th = calculate_sigmaGsq(pkGg, prod(Lxyz ./ nxyz))
+    # @time σGm² = 2 * log(mean_global(@strided exp.(deltarm)))
+    # @time σGg² = 2 * log(mean_global(@strided exp.(deltarg)))
+    # @show σGm²
+    # @show σGg²
+    # @time @strided @. deltarm = exp(deltarm - σGm²/2) - 1
+    # @time @strided @. deltarg = exp(deltarg - σGg²/2) - 1
+
+    # non-allocating version of <e^G>
+    @time @strided @. deltarm = exp(deltarm)
+    @time mean_expGm = 1 / mean_global(deltarm)
+    @time @strided @. deltarm = deltarm * mean_expGm - 1
+
+    # non-allocating version of <e^G>
+    @time @strided @. deltarg = exp(deltarg)
+    @time mean_expGg = 1 / mean_global(deltarg)
+    @time @strided @. deltarg = deltarg * mean_expGg - 1
+
     #@show σGm² σGg²
-    #@show mean(deltarm),std(deltarm)
-    #@show extrema(deltarm)
-    #@show mean(deltarg),std(deltarg)
-    #@show extrema(deltarg)
+    # @show mean(deltarm),std(deltarm)
+    # @show extrema(deltarm)
+    # @show mean(deltarg),std(deltarg)
+    # @show extrema(deltarg)
 
     if faH != 0
         # Note: In this section we ignore the Volume/(nx*ny*nz) multiplication
