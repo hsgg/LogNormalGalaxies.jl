@@ -489,7 +489,7 @@ end
 # their interface.
 
 # simulate galaxies
-function simulate_galaxies(nxyz, Lxyz, nbar, pk, b, faH; rfftplan=default_plan(nxyz), rng=Random.GLOBAL_RNG, voxel_window_power=1, velocity_assignment=1, win=1, sigma_psi=0.0, fixed=false, gather=true, minimize_shotnoise=false)
+function simulate_galaxies(nxyz, Lxyz, nbar, pk, b, faH; rfftplan=default_plan(nxyz), rng=Random.GLOBAL_RNG, voxel_window_power=1, velocity_assignment=1, win=1, sigma_psi=0.0, phase_shift=0.0, fixed=false, gather=true, minimize_shotnoise=false)
     nx, ny, nz = nxyz
     Lx, Ly, Lz = Lxyz
     Volume = Lx * Ly * Lz
@@ -498,6 +498,9 @@ function simulate_galaxies(nxyz, Lxyz, nbar, pk, b, faH; rfftplan=default_plan(n
 
     println("Draw random phases...")
     @time deltakm = draw_phases(rfftplan; rng)
+    if phase_shift != 0
+        @time @strided deltakm .*= cos(phase_shift) + im * sin(phase_shift)  # exp(im*π) does not specialize for irrational
+    end
     if fixed
         @strided @. deltakm /= abs(deltakm)
     end
@@ -612,8 +615,8 @@ end
 @doc raw"""
     simulate_galaxies(nbar, Lbox, pk; nmesh=256, bias=1.0, f=false,
         rfftplanner=default_plan, rng=Random.GLOBAL_RNG, voxel_window_power=1,
-        velocity_assignment=1, win=1, sigma_psi=0.0, fixed=false, gather=true,
-        minimize_shotnoise=false)
+        velocity_assignment=1, win=1, sigma_psi=0.0, phase_shift=0.0,
+        fixed=false, gather=true, minimize_shotnoise=false)
 
 Simulate galaxies using log-normal statistics.
 """
