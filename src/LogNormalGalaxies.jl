@@ -114,30 +114,33 @@ end
 
 ################## scale by P(k) ############################
 
-function scale_by_pk!(deltak, pk::Union{Function,Spline1D}, bias, kF, Volume)
-    println("  Calculating normal pkG...")
+function scale_by_pk!(deltak, pk, bias, kF, Volume; rfftplan)
+    println("  Calculating normal pkG via TwoFast...")
     @time kGg, pkG = pk_to_pkG(k -> bias^2 * pk(k))
-    @time multiply_by_pk!(deltak, pkG, kF, Volume)
-    return deltak
-end
 
-
-function multiply_by_pk!(deltak, pkfn, kF::Tuple, Volume)
-    iterate_kspace(deltak; usethreads=false) do ijk_local,ijk_global
+    @time iterate_kspace(deltak; usethreads=false) do ijk_local,ijk_global
         kx, ky, kz = kF .* ijk_global
+
         kmode = √(kx^2 + ky^2 + kz^2)
-        pk = pkfn(kmode)  # not thread-safe
+
+        pk = pkG(kmode)  # not thread-safe
+
         deltak[ijk_local...] *= √(pk * Volume)
     end
+
     return deltak
 end
 
-multiply_by_pk!(deltak, pkfn, kF, Volume) = multiply_by_pk!(deltak, pkfn, (kF...,), Volume)
 
+function scale_by_pk!(deltak, pk::AbstractArray{T,3}, bias, kF, Volume; rfftplan) where {T<:Number}
+    println("  Calculating normal pkG via 3D Fourier transform...")
+    @time xi = rfftplan \ pk
 
-function scale_by_pk!(deltak, pk::AbstractArray{T,3}, bias, _, Volume) where {T<:Number}
-    println("  Assuming `pk` is normal field power.")
-    @time @strided @. deltak *= √(pk * bias^2 * Volume)
+    @time @strided @. xi = log1p(bias^2 * xi)  # transform to Gaussian field correlation
+
+    @time pkG = rfftplan * xi
+
+    @time @strided @. deltak *= √(pkG * Volume)
 end
 
 
@@ -148,25 +151,33 @@ end
 #
 # Note that the first dimension must be larger than just n ÷ 2 + 1 so that the
 # corners of the box can be filled.
-function scale_by_pk!(deltak, pk::AbstractArray{T,2}, bias, _, Volume) where {T<:Number}
-    println("  Assuming `pk` is normal field power multipoles.")
+function scale_by_pk!(deltak, pk::AbstractArray{T,2}, bias, kF, Volume; rfftplan) where {T<:Number}
     lmax = size(pk, 2) - 1
-    deltak_0 = deltak[1,1,1]
-    @time iterate_kspace(deltak; usethreads=true) do ijk_local, ijk_global
+
+    pk3d = similar(deltak)
+
+    @time iterate_kspace(pk3d; usethreads=true) do ijk_local, ijk_global
         n = norm(ijk_global)
-        mu = eltype(deltak)(ijk_global[3] / n)
+
+        mu = eltype(pk3d)(ijk_global[3] / n)
+
         k = round(Int, n) + 1
+
         p = sum(pk[k,ell+1] * legendre(mu, ell) for ell in 0:lmax)
-        deltak[ijk_local...] *= √(p * bias^2 * Volume)
+
+        pk3d[ijk_local...] = p
     end
-    deltak[1,1,1] = deltak_0 * √(pk[1,1] * bias^2 * Volume)
-    return deltak
+
+    pk3d[1,1,1] = pk[1,1]
+
+    # Note: bias will be applied here:
+    scale_by_pk!(deltak, pk3d, bias, nothing, Volume; rfftplan)
 end
 
 
-function scale_by_pk!(deltak, pk::AbstractArray{T,1}, bias, _, Volume) where {T<:Number}
+function scale_by_pk!(deltak, pk::AbstractArray{T,1}, bias, kF, Volume; rfftplan) where {T<:Number}
     # reduce to 2D-array case with only a monopole:
-    scale_by_pk!(deltak, pk[:,:], bias, nothing, Volume)
+    scale_by_pk!(deltak, pk[:,:], bias, nothing, Volume; rfftplan)
 end
 
 
@@ -493,8 +504,8 @@ function simulate_galaxies(nxyz, Lxyz, nbar, pk, b, faH; rfftplan=default_plan(n
 
     println("Calculate deltak{m,g}...")
     @time deltakg = deepcopy(deltakm)
-    scale_by_pk!(deltakm, pk, 1, kF, Volume)
-    scale_by_pk!(deltakg, pk, b, kF, Volume)
+    scale_by_pk!(deltakm, pk, 1, (kF...,), Volume; rfftplan)
+    scale_by_pk!(deltakg, pk, b, (kF...,), Volume; rfftplan)
     #@time pixel_window!(deltakm, nxyz; voxel_window_power)
     #@time pixel_window!(deltakg, nxyz; voxel_window_power)
 

@@ -9,6 +9,7 @@ using DelimitedFiles
 using Random
 using StableRNGs
 using BenchmarkTools
+using PkSpectra
 
 
 @testset "LogNormalGalaxies" begin
@@ -140,22 +141,26 @@ using BenchmarkTools
         # Someone may give other data types than Float64 to the module. Let's be
         # able to handle that.
         data = readdlm((@__DIR__)*"/matterpower.dat")
-        pk = Spline1D(data[2:end,1], data[2:end,2], extrapolation=Splines.powerlaw)
-        @show typeof(data)
-        @show typeof(pk)
-        @show pk(0.01)
+        pk0 = Spline1D(data[2:end,1], data[2:end,2], extrapolation=Splines.powerlaw)
+        pk1 = PkDefault()
 
-        k, pkG = LogNormalGalaxies.pk_to_pkG(pk)
+        for pk in [pk0, pk1]
+            @show typeof(data)
+            @show typeof(pk)
+            @show pk(0.01)
 
-        nbar = 3e-4
-        L = 100.0
-        n = 64
-        b = 1.0
-        f = 1
-        x⃗, Ψ = simulate_galaxies(nbar, L, pk; nmesh=n, bias=b, f=1, rfftplanner=LogNormalGalaxies.plan_with_fftw)
-        x⃗, Ψ = simulate_galaxies(nbar, L, pk; nmesh=n, bias=b, f=false, rfftplanner=LogNormalGalaxies.plan_with_fftw)
-        x⃗, Ψ = simulate_galaxies(nbar, [L,L,L], pk; nmesh=[n,n,n], bias=b, f=false, rfftplanner=LogNormalGalaxies.plan_with_fftw)
-        x⃗, Ψ = simulate_galaxies(nbar, [L,L,L], pk; nmesh=[n,n,n], bias=b, f=true, rfftplanner=LogNormalGalaxies.plan_with_fftw)
+            k, pkG = LogNormalGalaxies.pk_to_pkG(pk)
+
+            nbar = 3e-4
+            L = 100.0
+            n = 64
+            b = 1.0
+            f = 1
+            x⃗, Ψ = simulate_galaxies(nbar, L, pk; nmesh=n, bias=b, f=1, rfftplanner=LogNormalGalaxies.plan_with_fftw)
+            x⃗, Ψ = simulate_galaxies(nbar, L, pk; nmesh=n, bias=b, f=false, rfftplanner=LogNormalGalaxies.plan_with_fftw)
+            x⃗, Ψ = simulate_galaxies(nbar, [L,L,L], pk; nmesh=[n,n,n], bias=b, f=false, rfftplanner=LogNormalGalaxies.plan_with_fftw)
+            x⃗, Ψ = simulate_galaxies(nbar, [L,L,L], pk; nmesh=[n,n,n], bias=b, f=true, rfftplanner=LogNormalGalaxies.plan_with_fftw)
+        end
     end
 
 
