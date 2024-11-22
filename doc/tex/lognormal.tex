@@ -621,7 +621,37 @@ B_{12,23,31}
 \,P(\vk_2 + \vq_3)
 \,P(\vq_3)
 \ea
-The bispectrum multipoles are\ldots
+The bispectrum multipoles are given by first putting the multipole on the first
+delta, then binning in $k_i$ shells. We get
+\begin{widetext}
+\ba
+B^\mathrm{meas}_\ell(k_1,k_2,k_3)
+&=
+\frac{1}{(2\pi)^3N^{123}_\mathrm{tri}}
+\int_{k_1}\dd^3k_1'
+\int_{k_2}\dd^3k_2'
+\int_{k_3}\dd^3k_3'
+%\vs&\quad\times
+\<\delta_\ell(\vk_1')
+\,\delta(\vk_2')
+\,\delta(\vk_3')\>
+\vs
+&=
+\frac{1}{(2\pi)^3N^{123}_\mathrm{tri}}
+\int_{k_1}\dd^3k_1'
+\int_{k_2}\dd^3k_2'
+\int_{k_3}\dd^3k_3'
+%\vs&\quad\times
+\int\dd^3x
+\,e^{-i\vk_1'\cdot\vx}
+\,\mathcal{L}_\ell(\khat_1'\cdot\xhat)
+\int\frac{\dd^3q_1'}{(2\pi)^3}
+\,e^{i\vq_1'\cdot\vx}
+\<\delta(\vq_1')
+\,\delta(\vk_2')
+\,\delta(\vk_3')\>
+\ea
+\end{widetext}
 
 
 
