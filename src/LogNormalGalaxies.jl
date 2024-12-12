@@ -114,9 +114,9 @@ end
 
 ################## scale by P(k) ############################
 
-function scale_by_pk!(deltak, pk, bias, kF, Volume; rfftplan)
-    println("  Calculating normal pkG via TwoFast...")
-    @time kGg, pkG = pk_to_pkG(k -> bias^2 * pk(k))
+function multiply_by_pkG!(deltak, pkG, kF, Volume)
+    # This function only exists so that pkG is type-stable within
+    # `iterate_kspace()`.
 
     @time iterate_kspace(deltak; usethreads=false) do ijk_local,ijk_global
         kx, ky, kz = kF .* ijk_global
@@ -129,6 +129,14 @@ function scale_by_pk!(deltak, pk, bias, kF, Volume; rfftplan)
     end
 
     return deltak
+end
+
+
+function scale_by_pk!(deltak, pk, bias, kF, Volume; rfftplan)
+    println("  Calculating normal pkG via TwoFast...")
+    @time kGg, pkG = pk_to_pkG(k -> bias^2 * pk(k))
+
+    return multiply_by_pkG!(deltak, pkG, kF, Volume)
 end
 
 
