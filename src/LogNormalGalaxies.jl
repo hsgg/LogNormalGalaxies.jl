@@ -502,12 +502,41 @@ function pixel_window!(deltak, nxyz; voxel_window_power=1)
 end
 
 
+@doc raw"""
+    set_fixed_phase!(deltak, fixed_phase)
+
+Sets the phases in `deltak` according to `fixed_phase`. If `fixed_phase` is a
+boolean, then the value `true` will randomly select a phase, whereas the value
+`false` will do nothing.
+
+The parameter `fixed_phase` can also be a complex number, in which case that
+will be used for the phase.
+
+A fixed phase is not possible, because we need δ(-k) = δ^*(k) so that δ(r)
+is real, unless `fixed_phase` is real.
+"""
+function set_fixed_phase!(deltak, fixed_phase::Bool)
+    if fixed_phase
+        set_fixed_phase!(deltak, 0)
+    end
+
+    return deltak  # do nothing
+end
+
+function set_fixed_phase!(deltak, phase)
+    # exp(im*π) does not specialize for irrational
+    exp_phase = cos(phase) + im * sin(phase)
+    exp_phase_normed = exp_phase / abs(exp_phase)
+    return @strided @. deltak = abs(deltak) * exp_phase_normed
+end
+
+
 ################## simulate_galaxies() ##################
 # Here are multiple functions called 'simulate_galaxies()'. They only differ in
 # their interface.
 
 # simulate galaxies
-function simulate_galaxies(nxyz, Lxyz, nbar, pk, b, faH; rfftplan=default_plan(nxyz), rng=Random.GLOBAL_RNG, voxel_window_power=1, velocity_assignment=1, win=1, sigma_psi=0.0, phase_shift=0.0, fixed=false, gather=true, minimize_shotnoise=false)
+function simulate_galaxies(nxyz, Lxyz, nbar, pk, b, faH; rfftplan=default_plan(nxyz), rng=Random.GLOBAL_RNG, voxel_window_power=1, velocity_assignment=1, win=1, sigma_psi=0.0, phase_shift=0.0, fixed_amplitude=false, fixed_phase=false, gather=true, minimize_shotnoise=false)
     nx, ny, nz = nxyz
     Lx, Ly, Lz = Lxyz
     Volume = Lx * Ly * Lz
@@ -516,10 +545,12 @@ function simulate_galaxies(nxyz, Lxyz, nbar, pk, b, faH; rfftplan=default_plan(n
 
     println("Draw random phases...")
     @time deltakm = draw_phases(rfftplan; rng)
+    @time set_fixed_phase!(deltakm, fixed_phase)
     if phase_shift != 0
-        @time @strided deltakm .*= cos(phase_shift) + im * sin(phase_shift)  # exp(im*π) does not specialize for irrational
+        # exp(im*π) does not specialize for irrational
+        @time @strided deltakm .*= cos(phase_shift) + im * sin(phase_shift)
     end
-    if fixed
+    if fixed_amplitude
         @strided @. deltakm /= abs(deltakm)
     end
 
@@ -557,15 +588,22 @@ function simulate_galaxies(nxyz, Lxyz, nbar, pk, b, faH; rfftplan=default_plan(n
     # @time @strided @. deltarm = exp(deltarm - σGm²/2) - 1
     # @time @strided @. deltarg = exp(deltarg - σGg²/2) - 1
 
+
     # non-allocating version of <e^G>
     @time @strided @. deltarm = exp(deltarm)
+    # @show mean_global(deltarm), var_global(deltarm)
+    # @show extrema(deltarm),deltarm[1,1,1]
     @time mean_expGm = 1 / mean_global(deltarm)
     @time @strided @. deltarm = deltarm * mean_expGm - 1
 
     # non-allocating version of <e^G>
     @time @strided @. deltarg = exp(deltarg)
+    # @show mean_global(deltarg)
     @time mean_expGg = 1 / mean_global(deltarg)
     @time @strided @. deltarg = deltarg * mean_expGg - 1
+
+    # @assert all(isfinite.(deltarm))
+    # @assert all(isfinite.(deltarg))
 
     #@show σGm² σGg²
     # @show mean(deltarm),std(deltarm)
@@ -645,7 +683,8 @@ end
     simulate_galaxies(nbar, Lbox, pk; nmesh=256, bias=1.0, f=false,
         rfftplanner=default_plan, rng=Random.GLOBAL_RNG, voxel_window_power=1,
         velocity_assignment=1, win=1, sigma_psi=0.0, phase_shift=0.0,
-        fixed=false, gather=true, minimize_shotnoise=false)
+        fixed_amplitude=false, fixed_phase=false, gather=true,
+        minimize_shotnoise=false)
 
 Simulate galaxies using log-normal statistics.
 """
