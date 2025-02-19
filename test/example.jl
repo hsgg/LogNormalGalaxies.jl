@@ -29,24 +29,31 @@ end
 
 function main()
     b = 1.8
-    f = 0.71
-    D = 0.82
-
-    data = readdlm((@__DIR__)*"/matterpower.dat", comments=true)
-    _pk = Spline1D(data[:,1], data[:,2], extrapolation=Splines.powerlaw)
-    pk(k) = D^2 * _pk(k)
+    f = 0.0
+    D = 1.0
 
     nbar = 3e-4
     L = 2e3
-    ΔL = 50.0  # buffer for RSD
-    n = 512
+    n = 256
+    LLL = [L, L, L]
+    nnn = [n, n, n]
+    box_center = [0,0,0]
     #Random.seed!(8143083339)
 
+    data = readdlm((@__DIR__)*"/matterpower.dat", comments=true)
+    _pk = Spline1D(data[:,1], data[:,2], extrapolation=Splines.powerlaw)
+    pkfn(k) = D^2 * _pk(k)
+
+    ## choose
+    # pk = pkfn
+    kin = (2π/L) * (0:n)
+    pk = pkfn.(kin)
+
     # generate catalog
-    x⃗, Ψ = simulate_galaxies(nbar, L+ΔL, pk; nmesh=n, bias=b, f=1)
+    x⃗, Ψ = simulate_galaxies(nbar, L, pk; nmesh=n, bias=b, f=(f!=0), voxel_window_power=2)
 
     # add RSD
-    los = [0.0, 0.0, 1.0]
+    los = [0, 0, 1]
     Ngals = size(x⃗,2)
     for i=1:Ngals
         x⃗[:,i] .+= f * (Ψ[:,i]' * los) * los
@@ -57,21 +64,22 @@ function main()
     @. sel &= -L/2 <= x⃗[2,:] <= L/2
     @. sel &= -L/2 <= x⃗[3,:] <= L/2
     x⃗ = x⃗[:,sel]
-
-    # measure multipoles
-    km, pkm, Mlm, Ngalaxies = x⃗gals_to_pkm([L,L,L], [n,n,n], x⃗; lmax=4)
+    x⃗ = MeasurePowerSpectra.periodic_boundaries!(x⃗, LLL, box_center)
+    km, pkm, nmodes = xgals_to_pkl_planeparallel(x⃗, LLL, nnn, box_center; voxel_window_power=3)
 
     # theory
     β = f / b
-    pkm_kaiser = @. b^2 * Arsd_Kaiser(β, (0:4)') * pk(km)
+    pkm_kaiser = @. b^2 * Arsd_Kaiser(β, (0:4)') * pkfn(km)
+
+    n = 0
 
     # plot
-    close("all")  # close previous plots
+    plotclose("all")  # close previous plots
     figure()
-    plot(km, b^2 .* km.*pk.(km), "k", label="input \$k\\,P(k)\$")
+    plot(km, b^2 .* km.^n.*pkfn.(km), "k", label="input \$k^{$n}\\,P(k)\$")
     for m=1:size(pkm,2)
-        plot(km, km.*pkm[:,m], "C$(m-1)-", label="\$k\\,P_{$(m-1)}(k)\$")
-        plot(km, km.*pkm_kaiser[:,m], "C$(m-1)--")
+        plot(km, km.^n.*pkm[:,m], "C$(m-1)-", label="\$k^{$n}\\,P_{$(m-1)}(k)\$")
+        plot(km, km.^n.*pkm_kaiser[:,m], "C$(m-1)--")
     end
     xlabel(L"k")
     ylabel(L"k\,P_\ell(k)")
