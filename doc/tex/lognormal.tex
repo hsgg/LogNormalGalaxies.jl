@@ -293,7 +293,7 @@ $G(\vx)$ is a Gaussian field with vanishing mean so that
 = e^{\frac12\<G^2\>}\,,
 \ea
 where Wick's theorem was used.
-Then, defining
+Inserting \cref{eq:delta_deltaG} into
 \ba
 \xi(\vr) &= \<\delta(\vx)\delta(\vx+\vr)\>_\vx\,,
 \ea
@@ -303,6 +303,36 @@ we get
 \xi_G(\vr) &= \ln(1 + \xi(\vr))\,,
 \ea
 where we assumed a homogeneous universe.
+
+% \hg{
+% Alternatively,
+% \ba
+% \xi(\vr)
+% &=
+% \< \delta(\vx) \,\delta(\vx+\vr) \>
+% \\
+% &=
+% \< \left[e^{G(\vx) - \frac12\<G^2\>}-1\right]
+% \left[e^{G(\vx+\vr) - \frac12\<G^2\>}-1\right]\>
+% \\
+% &=
+% \< e^{G(\vx) + G(\vx+\vr)} \> e^{- \<G^2\>}
+% - 1
+% \\
+% &=
+% e^{\frac12\<[G(\vx) + G(\vx+\vr)]^2\>} e^{- \<G^2\>}
+% - 1
+% \\
+% &=
+% e^{\<G(\vx)G(\vx+\vr)\>}
+% - 1
+% \\
+% &=
+% e^{\xi_G(\vr)}
+% - 1
+% \ea
+% }
+
 To get the normally-distributed power spectrum $P_G(\vq)$, we first
 Fourier-transform the power spectrum $P(\vk)$, apply \refeq{xiG}, and then
 transform to $P_G(\vk)$. That is,

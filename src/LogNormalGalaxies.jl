@@ -123,9 +123,9 @@ function multiply_by_pkG!(deltak, pkG, kF, Volume)
 
         kmode = √(kx^2 + ky^2 + kz^2)
 
-        pk = pkG(kmode)  # not thread-safe
+        pkG_mode = pkG(kmode)  # not thread-safe
 
-        deltak[ijk_local...] *= √(pk * Volume)
+        deltak[ijk_local...] *= √(pkG_mode * Volume)
     end
 
     return deltak
@@ -142,11 +142,17 @@ end
 
 function scale_by_pk!(deltak, pk::AbstractArray{T,3}, bias, kF, Volume; rfftplan) where {T<:Number}
     println("  Calculating normal pkG via 3D Fourier transform...")
-    @time xi = rfftplan \ pk
+    @assert length(kF) == 3
+    N3 = prod(size(rfftplan))
+    d3k = prod(kF)
+    d3x = Volume / N3
 
-    @time @strided @. xi = log1p(bias^2 * xi)  # transform to Gaussian field correlation
+    @time @strided xi = rfftplan \ pk .* (N3 * d3k / (2π)^3)
 
-    @time pkG = rfftplan * xi
+    # transform to Gaussian field correlation
+    @time @strided @. xi = log1p(bias^2 * xi)
+
+    @time @strided pkG = rfftplan * xi .* d3x
 
     @time @strided @. deltak *= √(pkG * Volume)
 end
@@ -179,13 +185,13 @@ function scale_by_pk!(deltak, pk::AbstractArray{T,2}, bias, kF, Volume; rfftplan
     pk3d[1,1,1] = pk[1,1]
 
     # Note: bias will be applied here:
-    scale_by_pk!(deltak, pk3d, bias, nothing, Volume; rfftplan)
+    scale_by_pk!(deltak, pk3d, bias, kF, Volume; rfftplan)
 end
 
 
 function scale_by_pk!(deltak, pk::AbstractArray{T,1}, bias, kF, Volume; rfftplan) where {T<:Number}
     # reduce to 2D-array case with only a monopole:
-    scale_by_pk!(deltak, pk[:,:], bias, nothing, Volume; rfftplan)
+    scale_by_pk!(deltak, pk[:,:], bias, kF, Volume; rfftplan)
 end
 
 
