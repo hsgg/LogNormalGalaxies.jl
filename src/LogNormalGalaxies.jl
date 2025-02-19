@@ -236,8 +236,12 @@ function draw_galaxies_with_velocities(deltar, vx, vy, vz, Navg, Ngalaxies, Δx,
         jg = localrange[2][j]  # global index of local index j
         kg = localrange[3][k]  # global index of local index k
 
+        Nmean_thiscell = (1 + deltar[i,j,k]) * Navg
+        if !isfinite(Nmean_thiscell)
+            @error "Nmean_thiscell is not finite" (i,j,k) (ig,jg,kg) Nmean_thiscell deltar[i,j,k] Navg
+        end
+
         if minimize_shotnoise
-            Nmean_thiscell = (1 + deltar[i,j,k]) * Navg
             Nthiscell = floor(Int, Nmean_thiscell)
             dN = Nmean_thiscell - Nthiscell
             if rand(rng) > 1 - dN
@@ -245,7 +249,7 @@ function draw_galaxies_with_velocities(deltar, vx, vy, vz, Navg, Ngalaxies, Δx,
             end
         else
             # standard Poisson sampling
-            Nthiscell = pois_rand(rng, (1 + deltar[i,j,k]) * Navg)
+            Nthiscell = pois_rand(rng, Nmean_thiscell)
         end
 
         g0 = 6 * Ngalaxies_local_actual  # g0 is the index in the xyzv 1D-array
