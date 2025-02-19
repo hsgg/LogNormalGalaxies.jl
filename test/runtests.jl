@@ -267,6 +267,10 @@ using PkSpectra
     # @testset "example.jl" begin
     #     include("example.jl")
     # end
+
+    # @testset "complenetary_sims.jl" begin
+    #     include("complenetary_sims.jl")
+    # end
 end
 
 
