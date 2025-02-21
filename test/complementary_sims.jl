@@ -7,18 +7,44 @@ using Statistics
 using PythonPlot
 using Random
 using Test
+using LinearAlgebra
 
 @testset "Complimentary simulations" begin
     include("lib.jl")
 
-    nbar = 1e-4
+    function apply_window(positions, box_center, rmin, rmax; dowin=true)
+        if dowin
+            Ngals = size(positions,2)
+            select = fill(false, Ngals)
+            for i=1:Ngals
+                x = positions[1,i]
+                y = positions[2,i]
+                z = positions[3,i]
+                x, y, z = @. (x,y,z) - box_center
+                r = √(x^2 + y^2 + z^2)
+                if rmin <= r <= rmax
+                    select[i] = true
+                end
+            end
+            positions = collect(positions[:,select])
+        end
+        return positions
+    end
+
+
+    nbar = 5e-4
     L = 4e3
     n_sim = 256
     n_est = 256
     bias = 1.5
     f = 0.7
+    pk_matched = true
     fixed_amplitude = false
     fixed_phase = false
+
+    dowin = true
+    rmin = 0.2 * L
+    rmax = 0.4 * L
 
     LLL = L .* [1,1,1]
     nnn_est = n_est .* [1,1,1]
@@ -26,13 +52,16 @@ using Test
     lmax = 0
     ikmin = 1
 
+    Nrandoms = ceil(Int, 2 * prod(LLL) * nbar)
+    nbar_rand = nbar * 10
+
     opts_sim = (; nmesh=n_sim, bias, f=(f!=0), fixed_amplitude, fixed_phase,
                 voxel_window_power=2, velocity_assignment=6)
 
-    opts_est = (nbar=nbar, lmax=lmax, do_mu_leakage=true, subtract_shotnoise=true,
+    opts_est = (; nbar, lmax, do_mu_leakage=true, subtract_shotnoise=true,
                 voxel_window_power=3)
 
-    id = "fixed_amplitude=$fixed_amplitude, fixed_phase=$fixed_phase"
+    id = "matched: $pk_matched, fixed (A,phi) = ($fixed_amplitude, $fixed_phase)"
 
     #keq = 2e-2
     #c = 3 * keq^4
@@ -51,29 +80,45 @@ using Test
     #seed = UInt64[0x01ca4eddf1fdc165, 0xd87d80f08f1e36f8, 0x0ecc4300d7f0a61c, 0xeb0ab21155f56174]
     @show seed
 
-    simulate_mean(; phase_shift) = begin
+    simulate(; phase_shift) = begin
         Random.seed!(seed)
-        @time x⃗, Ψ = simulate_galaxies(nbar, L, pk; opts_sim..., f=false, phase_shift)
-        x⃗ = MeasurePowerSpectra.periodic_boundaries!(x⃗, LLL, box_center)
-        ki, pki, nmodesi = xgals_to_pkl_planeparallel(x⃗, LLL, nnn_est, box_center; opts_est..., lmax=0)
+        if pk_matched
+            pk_in = deepcopy(pk)
+            @time x⃗, Ψ = simulate_galaxies(nbar, L, pk_in; opts_sim..., f=false, phase_shift)
+            x⃗ = MeasurePowerSpectra.periodic_boundaries!(x⃗, LLL, box_center)
+            ki, pki, nmodesi = xgals_to_pkl_planeparallel(x⃗, LLL, nnn_est, box_center; opts_est..., lmax=0)
 
-        pk_in = deepcopy(pk)
-        idxs = 1:length(pki[:,1])
-        @. pk_in[idxs] = pk[idxs]^2 * bias^2 / pki[:,1]
+            idxs = 1:length(pki[:,1])
+            @. pk_in[idxs] = pk[idxs]^2 * bias^2 / pki[:,1]
 
-        Random.seed!(seed)
-        @time x⃗, Ψ = simulate_galaxies(nbar, L, pk_in; opts_sim..., phase_shift)
+            Random.seed!(seed)
+            @time x⃗, Ψ = simulate_galaxies(nbar, L, pk_in; opts_sim..., phase_shift)
+        else
+            @time x⃗, Ψ = simulate_galaxies(nbar, L, pk; opts_sim..., phase_shift)
+        end
+
         x⃗ = MeasurePowerSpectra.periodic_boundaries!(x⃗, LLL, box_center)
         return x⃗, Ψ
     end
 
     mymean(a, b) = middle(a, b)
 
-    @time x⃗1, Ψ1 = simulate_mean(phase_shift=0)
-    @time x⃗2, Ψ2 = simulate_mean(phase_shift=π)
+    @time x⃗1, Ψ1 = simulate(phase_shift=0)
+    @time x⃗2, Ψ2 = simulate(phase_shift=π)
+    @time x⃗rand = LLL .* (rand(3, Nrandoms) .- 1 // 2) .+ box_center
 
-    k1, pk1, nmodes1 = xgals_to_pkl_planeparallel(x⃗1, LLL, nnn_est, box_center; opts_est...)
-    k2, pk2, nmodes2 = xgals_to_pkl_planeparallel(x⃗2, LLL, nnn_est, box_center; opts_est...)
+    x⃗1w = apply_window(x⃗1, box_center, rmin, rmax; dowin)
+    x⃗2w = apply_window(x⃗2, box_center, rmin, rmax; dowin)
+    x⃗randw = apply_window(x⃗rand, box_center, rmin, rmax; dowin)
+    if dowin
+        volume = 4π / 3 * (rmax^3 - rmin^3)
+    else
+        volume = prod(LLL)
+    end
+    nbar_rand = size(x⃗randw, 2) / volume
+
+    k1, pk1, nmodes1 = xgals_to_pkl_planeparallel(x⃗1w, x⃗randw, LLL, nnn_est, box_center; opts_est..., nbar_rand)
+    k2, pk2, nmodes2 = xgals_to_pkl_planeparallel(x⃗2w, x⃗randw, LLL, nnn_est, box_center; opts_est..., nbar_rand)
 
     pk = pk[ikmin:length(k1)]
 
@@ -103,7 +148,7 @@ using Test
     chisq12 = round(mean(chisq12_i[idx_range,:]), sigdigits=4)
 
     figure()
-    title("Real space")
+    title("Real space: $id, dowindow=$dowin")
     hlines(1/nbar, extrema(k1)..., color="0.75")
     plot(k1, pk_real, "k-", lw=0.5)
     plot(k1, pk1[:,:], "-", label="phase=0")
@@ -114,7 +159,7 @@ using Test
     legend()
 
     figure()
-    title("Real space: $id")
+    title("Real space: $id, dowindow=$dowin")
     text(0.01, 1.25, "\$\\chi_{0,1}^2=$chisq1_l0\$\n\$\\chi_{0,2}^2=$chisq2_l0\$\n\$\\chi_{0,12}^2=$chisq12_l0\$")
     text(0.07, 1.25, "\$\\chi_1^2=$chisq1\$\n\$\\chi_2^2=$chisq2\$\n\$\\chi_{12}^2=$chisq12\$")
     hlines(1, extrema(k1)..., color="0.75")
@@ -136,8 +181,11 @@ using Test
     apply_rsd!(x⃗2, Ψ2, f, los)
     x⃗1 = MeasurePowerSpectra.periodic_boundaries!(x⃗1, LLL, box_center)
     x⃗2 = MeasurePowerSpectra.periodic_boundaries!(x⃗2, LLL, box_center)
-    k1, pk1, nmodes1 = xgals_to_pkl_planeparallel(x⃗1, LLL, nnn_est, box_center; opts_est...)
-    k2, pk2, nmodes2 = xgals_to_pkl_planeparallel(x⃗2, LLL, nnn_est, box_center; opts_est...)
+    x⃗1w = apply_window(x⃗1, box_center, rmin, rmax; dowin)
+    x⃗2w = apply_window(x⃗2, box_center, rmin, rmax; dowin)
+    x⃗randw = apply_window(x⃗rand, box_center, rmin, rmax; dowin)
+    k1, pk1, nmodes1 = xgals_to_pkl_planeparallel(x⃗1w, x⃗randw, LLL, nnn_est, box_center; opts_est..., nbar_rand)
+    k2, pk2, nmodes2 = xgals_to_pkl_planeparallel(x⃗2w, x⃗randw, LLL, nnn_est, box_center; opts_est..., nbar_rand)
     k1 = k1[ikmin:end]
     k2 = k2[ikmin:end]
     pk1 = pk1[ikmin:end,:]
@@ -161,7 +209,7 @@ using Test
     chisq12 = round(mean(chisq12_i[idx_range,:]), sigdigits=4)
 
     figure()
-    title("Redshift space: $id")
+    title("Redshift space: $id, dowindow=$dowin")
     hlines(1/nbar, extrema(k1)..., color="0.75")
     plot(k1, pkm_kaiser[:,:], "-", lw=0.5)
     gca().set_prop_cycle(nothing)
@@ -172,7 +220,7 @@ using Test
     xlim(0, 0.25)
 
     figure()
-    title("Redshift space: $id")
+    title("Redshift space: $id, dowindow=$dowin")
     text(0.01, 1.25, "\$\\chi_{0,1}^2=$chisq1_l0\$\n\$\\chi_{0,2}^2=$chisq2_l0\$\n\$\\chi_{0,12}^2=$chisq12_l0\$")
     text(0.07, 1.25, "\$\\chi_1^2=$chisq1\$\n\$\\chi_2^2=$chisq2\$\n\$\\chi_{12}^2=$chisq12\$")
     hlines(1, extrema(k1)..., color="0.75")
