@@ -1,3 +1,8 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+
 # In this file we put functions related to the transform from the power
 # spectrum pk of the density field δ to the power spectrum pkG of the lognormal
 # density field G=ln(1+\delta)-μ.

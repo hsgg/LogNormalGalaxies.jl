@@ -1,3 +1,8 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+
 # In this file we define functions so that we can use our code either with FFTW
 # or with PencilFFTs, without needing big changes. Generally, PencilFFTs need
 # more support, so if it works with PencilFFTs, it should also work with FFTW.
