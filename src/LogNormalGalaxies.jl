@@ -606,10 +606,25 @@ function simulate_galaxies(nxyz, Lxyz, nbar, pk, b, faH; rfftplan=default_plan(n
     # @assert all(isfinite.(deltarg))
 
     #@show σGm² σGg²
-    # @show mean(deltarm),std(deltarm)
-    # @show extrema(deltarm)
-    # @show mean(deltarg),std(deltarg)
-    # @show extrema(deltarg)
+    @show mean(deltarm),std(deltarm)
+    @show extrema(deltarm)
+    @show mean(deltarg),std(deltarg)
+    @show extrema(deltarg)
+
+
+    false && if phase_shift != 0
+        println("Inverting deltarg...")
+        @. deltarm = 1 / (1 + deltarm) - 1
+        @. deltarg = 1 / (1 + deltarg) - 1
+        @show mean(deltarg),std(deltarg)
+        @show extrema(deltarg)
+        mean_1pdeltarm = mean_global(@. 1 + deltarm)
+        mean_1pdeltarg = mean_global(@. 1 + deltarg)
+        @. deltarm = @. (1 + deltarm) / mean_1pdeltarm - 1
+        @. deltarg = @. (1 + deltarg) / mean_1pdeltarg - 1
+        @show mean(deltarg),std(deltarg)
+        @show extrema(deltarg)
+    end
 
     if faH != 0
         # Note: In this section we ignore the Volume/(nx*ny*nz) multiplication

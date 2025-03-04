@@ -32,17 +32,17 @@ using LinearAlgebra
     end
 
 
-    nbar = 5e-4
+    nbar = 1e-4
     L = 4e3
     n_sim = 256
     n_est = 256
     bias = 1.5
     f = 0.7
-    pk_matched = true
+    pk_matched = false
     fixed_amplitude = false
     fixed_phase = false
 
-    dowin = true
+    dowin = false
     rmin = 0.2 * L
     rmax = 0.4 * L
 
@@ -77,7 +77,7 @@ using LinearAlgebra
 
     Random.seed!(reinterpret(UInt64, time()))
     seed = rand(UInt64, 4)
-    #seed = UInt64[0x01ca4eddf1fdc165, 0xd87d80f08f1e36f8, 0x0ecc4300d7f0a61c, 0xeb0ab21155f56174]
+    seed = UInt64[0x01ca4eddf1fdc165, 0xd87d80f08f1e36f8, 0x0ecc4300d7f0a61c, 0xeb0ab21155f56174]
     @show seed
 
     simulate(; phase_shift) = begin
@@ -104,11 +104,15 @@ using LinearAlgebra
     mymean(a, b) = middle(a, b)
 
     @time x⃗1, Ψ1 = simulate(phase_shift=0)
+    @time x⃗3, Ψ3 = simulate(phase_shift=π/2)
     @time x⃗2, Ψ2 = simulate(phase_shift=π)
+    @time x⃗4, Ψ4 = simulate(phase_shift=3π/4)
     @time x⃗rand = LLL .* (rand(3, Nrandoms) .- 1 // 2) .+ box_center
 
     x⃗1w = apply_window(x⃗1, box_center, rmin, rmax; dowin)
+    x⃗3w = apply_window(x⃗3, box_center, rmin, rmax; dowin)
     x⃗2w = apply_window(x⃗2, box_center, rmin, rmax; dowin)
+    x⃗4w = apply_window(x⃗4, box_center, rmin, rmax; dowin)
     x⃗randw = apply_window(x⃗rand, box_center, rmin, rmax; dowin)
     if dowin
         volume = 4π / 3 * (rmax^3 - rmin^3)
@@ -118,16 +122,24 @@ using LinearAlgebra
     nbar_rand = size(x⃗randw, 2) / volume
 
     k1, pk1, nmodes1 = xgals_to_pkl_planeparallel(x⃗1w, x⃗randw, LLL, nnn_est, box_center; opts_est..., nbar_rand)
+    k3, pk3, nmodes3 = xgals_to_pkl_planeparallel(x⃗3w, x⃗randw, LLL, nnn_est, box_center; opts_est..., nbar_rand)
     k2, pk2, nmodes2 = xgals_to_pkl_planeparallel(x⃗2w, x⃗randw, LLL, nnn_est, box_center; opts_est..., nbar_rand)
+    k4, pk4, nmodes4 = xgals_to_pkl_planeparallel(x⃗4w, x⃗randw, LLL, nnn_est, box_center; opts_est..., nbar_rand)
 
     pk = pk[ikmin:length(k1)]
 
     k1 = k1[ikmin:end]
+    k3 = k3[ikmin:end]
     k2 = k2[ikmin:end]
+    k4 = k4[ikmin:end]
     pk1 = pk1[ikmin:end,:]
+    pk3 = pk3[ikmin:end,:]
     pk2 = pk2[ikmin:end,:]
+    pk4 = pk4[ikmin:end,:]
     nmodes1 = nmodes1[ikmin:end]
+    nmodes3 = nmodes3[ikmin:end]
     nmodes2 = nmodes2[ikmin:end]
+    nmodes4 = nmodes4[ikmin:end]
 
     @show length(k1) length(pk)
 
@@ -154,9 +166,12 @@ using LinearAlgebra
     plot(k1, pk1[:,:], "-", label="phase=0")
     gca().set_prop_cycle(nothing)
     plot(k2, pk2[:,:], "--", label="phase=pi")
+    plot(k3, pk3[:,:], "--", label="phase=pi/2")
+    plot(k4, pk4[:,:], "--", label="phase=3pi/4")
     plot(k1, mymean.(pk1, pk2), "k:")
     xlim(0, 0.25)
     legend()
+    return
 
     figure()
     title("Real space: $id, dowindow=$dowin")
