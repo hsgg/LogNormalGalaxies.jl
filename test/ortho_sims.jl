@@ -32,12 +32,84 @@ using LinearAlgebra
     end
 
 
-    nbar = 1e-3
+    function draw_deltarm(pk, LLL, rfftplan; rng)
+        kFarr = 2 * π ./ LLL
+        nnn_sim = size(rfftplan)
+        vol = prod(LLL)
+
+        @time deltakm = LogNormalGalaxies.draw_phases(rfftplan; rng)
+
+        @time LogNormalGalaxies.scale_by_pk!(deltakm, pk, 1, (kFarr...,), vol; rfftplan)
+
+        @time deltarm = rfftplan \ deltakm
+        Ncells = prod(nnn_sim)
+        @time @. deltarm *= Ncells / vol
+
+        # convert G -> δ
+        @time @. deltarm = exp(deltarm)
+        @time mean_expGm = 1 / LogNormalGalaxies.mean_global(deltarm)
+        @time @. deltarm = deltarm * mean_expGm - 1
+
+        return deltarm
+    end
+
+
+    function calc_parallel_velocity_field(ell, deltarm, LLL, box_center; rfftplan)
+        nnn_sim = LogNormalGalaxies.size_global(deltarm)
+        kFarr = 2 * π ./ LLL
+        Δx = LLL ./ nnn_sim
+        tesseral = true
+        box_corner = box_center - LLL ./ 2
+
+        @time vz = similar(deltarm)
+        @time @. vz = 0
+
+        @time deltakm = rfftplan * deltarm
+        n_ell = ell - 1
+
+        for m = -n_ell:n_ell
+            println("  m = $m")
+            @time deltakm_m = deepcopy(deltakm)
+
+            @time Ynm_fn = MeasurePowerSpectra.get_ylm_fn(n_ell, m; tesseral)
+
+            @time LogNormalGalaxies.iterate_kspace(deltakm_m; usethreads=true) do ijk_local, ijk_global
+                kx = kFarr[1] * ijk_global[1]
+                ky = kFarr[2] * ijk_global[2]
+                kz = kFarr[3] * ijk_global[3]
+                k = √(kx^2 + ky^2 + kz^2)
+                if k == 0
+                    deltakm_m[ijk_local...] = 0
+                else
+                    deltakm_m[ijk_local...] *= im * Ynm_fn(kx, ky, kz) / k
+                end
+            end
+
+            @assert all(isfinite.(deltakm_m))
+
+            @time vz_m = rfftplan \ deltakm_m
+            @time @. vz_m *= 4 * π / (2 * n_ell + 1)
+
+            @time MeasurePowerSpectra.Ylm_mult!(vz_m, n_ell, m, box_corner, Δx; use_conjugate=true, tesseral)
+            if n_ell != 0
+                @time MeasurePowerSpectra.set_origin!(vz_m, 0, box_corner, Δx)
+            end
+
+            @assert all(isfinite.(vz_m))
+
+            @time @. vz += vz_m
+        end
+
+        return vz
+    end
+
+
+    nbar = 2e-4
     L = 4e3
     n_sim = 256
     n_est = 256
     bias = 1.0
-    f = 0.7
+    f = 1.0
     pk_matched = false
     fixed_amplitude = false
     fixed_phase = false
@@ -68,7 +140,7 @@ using LinearAlgebra
 
     kin = @. kF * (0:n_sim)
     pk = fill(0.0, n_sim)
-    pk[100] = 30_000.0
+    pk[31] = 30_000.0
     ell = 2
 
     # keq = 2e-2
@@ -81,6 +153,7 @@ using LinearAlgebra
     Random.seed!(reinterpret(UInt64, time()))
     seed = rand(UInt64, 4)
     # seed = UInt64[0x01ca4eddf1fdc165, 0xd87d80f08f1e36f8, 0x0ecc4300d7f0a61c, 0xeb0ab21155f56174]
+    # seed = UInt64[0x2ae7feaac0f6e7dd, 0x346fa59ae074b2dd, 0x2d1cea3e2e9457ed, 0xcb6461d35302dee7]
     @show seed
 
     rfftplan = LogNormalGalaxies.default_plan(nnn_sim)
@@ -90,52 +163,13 @@ using LinearAlgebra
         println("===> Running simulation!")
         Random.seed!(seed)
 
-        @time deltakm = LogNormalGalaxies.draw_phases(rfftplan; rng)
-        LogNormalGalaxies.scale_by_pk!(deltakm, pk, 1, (kFarr...,), prod(LLL); rfftplan)
-        @time deltarm = rfftplan \ deltakm
-        Ncells = prod(nnn_sim)
-        vol = prod(LLL)
-        @time @. deltarm *= Ncells / vol
-
-        @time @. deltarm = exp(deltarm)
-        # @show mean_global(deltarm), var_global(deltarm)
-        # @show extrema(deltarm),deltarm[1,1,1]
-        @time mean_expGm = 1 / LogNormalGalaxies.mean_global(deltarm)
-        @time @. deltarm = deltarm * mean_expGm - 1
+        println("Draw deltarm...")
+        deltarm = draw_deltarm(pk, LLL, rfftplan; rng)
 
         println("Calculate velocities...")
         vx = fill(0.0, nnn_sim...)  # will store vpara in vz
         vy = vx
-        vz = fill(0.0, nnn_sim...)
-        @time deltakm = rfftplan * deltarm
-        n_ell = ell - 1
-        tesseral = true
-        for m = -n_ell:n_ell
-            println("  m = $m")
-            deltakm_m = deepcopy(deltakm)
-            Ynm_fn = MeasurePowerSpectra.get_ylm_fn(n_ell, m; tesseral)
-            @time LogNormalGalaxies.iterate_kspace(deltakm_m; usethreads=true) do ijk_local, ijk_global
-                n = norm(ijk_global)
-                kx = kF * ijk_global[1]
-                ky = kF * ijk_global[2]
-                kz = kF * ijk_global[3]
-                k = kF * n
-                if n == 0
-                    deltakm_m[ijk_local...] = 0
-                else
-                    deltakm_m[ijk_local...] *= im * Ynm_fn(kx, ky, kz) / k
-                end
-            end
-            @time vz_m = rfftplan \ deltakm_m
-            @time @. vz_m *= 4 * π / (2 * n_ell + 1)
-
-            ylm = conj(Ynm_fn(0, 0, 1))
-            @. vz_m *= ylm
-
-            # box_corner = box_center - LLL ./ 2 .+ [0,0,1e8]
-            # @time MeasurePowerSpectra.Ylm_mult!(vz_m, n_ell, m, box_corner, Δx; use_conjugate=true, tesseral)
-            @time @. vz += vz_m
-        end
+        vz = calc_parallel_velocity_field(ell, deltarm, LLL, box_center; rfftplan)
 
         println("Draw galaxies...")
         Ncells = prod(LogNormalGalaxies.size_global(deltarm))
@@ -143,8 +177,8 @@ using LinearAlgebra
         Ngalaxies = Navg * Ncells # * LogNormalGalaxies.mean_global(win)
         @time xyzv = LogNormalGalaxies.draw_galaxies_with_velocities(deltarm, vx, vy, vz, Navg, Ngalaxies, Δx, Val(true), Val(2), Val(0); rng)
 
-        x⃗ = collect(xyzv[1:3, :])
-        vpara = collect(xyzv[4:6, :])
+        x⃗ = xyzv[1:3, :]
+        vpara = xyzv[4:6, :]
 
         return x⃗, vpara
     end
@@ -154,6 +188,11 @@ using LinearAlgebra
     @time x⃗rand = LLL .* (rand(3, Nrandoms) .- 1 // 2)
     @. x⃗1 -= LLL / 2
     @. x⃗2 -= LLL / 2
+    @assert x⃗1 == x⃗2
+    if vpara1 != vpara2
+        @show mean(vpara1) std(vpara1) extrema(vpara1 .- vpara2)
+    end
+    @assert vpara1 == vpara2
 
     # insert ell
     los = [0, 0, 1]

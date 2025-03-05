@@ -18,7 +18,6 @@ function xicalc00_quadosc(fn, r)
 end
 
 
-
 #################### calculate P_G(k) ###########################
 function pk_to_pkG(pkfn)
     ## Notes: xicalc is fast here, quadosc is too slow for large r. However,

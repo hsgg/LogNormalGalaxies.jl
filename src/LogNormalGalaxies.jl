@@ -98,16 +98,6 @@ function draw_phases(rfftplan; rng=Random.GLOBAL_RNG)
     #@show mean(deltak_phases)
     #@assert !isnan(mean(deltak_phases))
 
-    #@show mean(deltar)
-    #@show var(deltar)
-    #@show mean(deltak_phases)
-    #@show var(deltak_phases)
-    #@show var(real(deltak_phases)) var(imag(deltak_phases))
-
-    #@strided @. deltak_phases /= abs(deltak_phases)
-    #@show mean(deltak_phases)
-    #@show var(deltak_phases)
-    #@show var(real(deltak_phases)) var(imag(deltak_phases))
     return deltak_phases
 end
 
@@ -163,8 +153,13 @@ end
 #
 #   pk(kx,ky,kz) = sum_l P_l(k) * L_l(mu)
 #
-# Note that the first dimension must be larger than just n ÷ 2 + 1 so that the
+# Note that the first dimension must be >= √3 * (n ÷ 2 + 1) so that the
 # corners of the box can be filled.
+#
+# NOTE: At some it probably makes sense to abstract the conversion from pk[k,l]
+# to a 3D array, rather than mixing it in with the scaling. Then, it also makes
+# sense to move the conversion from lognormal pk(k) to Gaussian pkG(k) into its
+# own function.
 function scale_by_pk!(deltak, pk::AbstractArray{T,2}, bias, kF, Volume; rfftplan) where {T<:Number}
     lmax = size(pk, 2) - 1
 
@@ -192,6 +187,37 @@ end
 function scale_by_pk!(deltak, pk::AbstractArray{T,1}, bias, kF, Volume; rfftplan) where {T<:Number}
     # reduce to 2D-array case with only a monopole:
     scale_by_pk!(deltak, pk[:,:], bias, kF, Volume; rfftplan)
+end
+
+
+##################### phase fixing #############################
+
+@doc raw"""
+    set_fixed_phase!(deltak, fixed_phase)
+
+Sets the phases in `deltak` according to `fixed_phase`. If `fixed_phase` is a
+boolean, then the value `true` will randomly select a phase, whereas the value
+`false` will do nothing.
+
+The parameter `fixed_phase` can also be a complex number, in which case that
+will be used for the phase.
+
+A fixed phase is not possible, because we need δ(-k) = δ^*(k) so that δ(r)
+is real, unless `fixed_phase` is real.
+"""
+function set_fixed_phase!(deltak, fixed_phase::Bool)
+    if fixed_phase
+        set_fixed_phase!(deltak, 0)
+    end
+
+    return deltak  # do nothing
+end
+
+function set_fixed_phase!(deltak, phase)
+    # exp(im*π) does not specialize for irrational
+    exp_phase = cos(phase) + im * sin(phase)
+    exp_phase_normed = exp_phase / abs(exp_phase)
+    return @strided @. deltak = abs(deltak) * exp_phase_normed
 end
 
 
@@ -499,35 +525,6 @@ function pixel_window!(deltak, nxyz; voxel_window_power=1)
         Wemsh = Wmesh ^ voxel_window_power
         deltak[ijk_local...] /= Wmesh  # acting on single δ
     end
-end
-
-
-@doc raw"""
-    set_fixed_phase!(deltak, fixed_phase)
-
-Sets the phases in `deltak` according to `fixed_phase`. If `fixed_phase` is a
-boolean, then the value `true` will randomly select a phase, whereas the value
-`false` will do nothing.
-
-The parameter `fixed_phase` can also be a complex number, in which case that
-will be used for the phase.
-
-A fixed phase is not possible, because we need δ(-k) = δ^*(k) so that δ(r)
-is real, unless `fixed_phase` is real.
-"""
-function set_fixed_phase!(deltak, fixed_phase::Bool)
-    if fixed_phase
-        set_fixed_phase!(deltak, 0)
-    end
-
-    return deltak  # do nothing
-end
-
-function set_fixed_phase!(deltak, phase)
-    # exp(im*π) does not specialize for irrational
-    exp_phase = cos(phase) + im * sin(phase)
-    exp_phase_normed = exp_phase / abs(exp_phase)
-    return @strided @. deltak = abs(deltak) * exp_phase_normed
 end
 
 
