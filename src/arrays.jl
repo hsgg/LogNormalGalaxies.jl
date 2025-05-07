@@ -66,6 +66,18 @@ function calc_global_indices(ijk_local, localrange, nx2, ny2, nz2, nx, ny, nz; w
 end
 
 
+# https://discourse.julialang.org/t/conditional-multithreading/32421/12?u=hsgg
+macro maybe_threads(usethreads, expr)
+    return quote
+        if $(usethreads)
+            Threads.@threads $(expr)
+        else
+            $(expr)
+        end
+    end |> esc
+end
+
+
 function iterate_kspace(func, deltak; usethreads=false, first_half_dimension=true, wrap=true)
     nx, ny, nz = size_global(deltak)
     nx2 = first_half_dimension ? nx : (div(nx,2) + 1)
@@ -73,16 +85,8 @@ function iterate_kspace(func, deltak; usethreads=false, first_half_dimension=tru
     nz2 = div(nz,2) + 1
     localrange = range_local(deltak)
 
-    if usethreads
-        Threads.@threads for k=1:size(deltak,3)
-            for j=1:size(deltak,2), i=1:size(deltak,1)
-                ijk_local = (i, j, k)
-                ijk_global = calc_global_indices(ijk_local, localrange, nx2, ny2, nz2, nx, ny, nz; wrap)
-                func(ijk_local, ijk_global)
-            end
-        end
-    else
-        for k=1:size(deltak,3), j=1:size(deltak,2), i=1:size(deltak,1)
+    @maybe_threads usethreads for k=1:size(deltak,3)
+        for j=1:size(deltak,2), i=1:size(deltak,1)
             ijk_local = (i, j, k)
             ijk_global = calc_global_indices(ijk_local, localrange, nx2, ny2, nz2, nx, ny, nz; wrap)
             func(ijk_local, ijk_global)
