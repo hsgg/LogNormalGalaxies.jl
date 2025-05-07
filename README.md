@@ -1,9 +1,8 @@
 # LogNormalGalaxies.jl
 
 
-This Julia package implements a simple log-normal galaxies simulation,
-described in Section IV of [Benabou, Sands et al.
-(2024)](https://arxiv.org/abs/2404.04811). It is heavily inspired by the
+This Julia package implements a simple log-normal galaxies simulation. It is
+heavily inspired by the
 [log_normal_galaxies](https://bitbucket.org/komatsu5147/lognormal_galaxies/src/master/)
 code introduced in [Agrawal et al. (2017)](https://arxiv.org/abs/1706.09195),
 where more details on log-normal simulations in general can be found.
