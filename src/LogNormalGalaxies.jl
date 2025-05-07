@@ -246,7 +246,9 @@ function draw_galaxies_with_velocities(deltar, vx, vy, vz, Navg, Ngalaxies, Δx,
         rng=Random.GLOBAL_RNG, minimize_shotnoise=false) where {do_rsd,voxel_window_power,velocity_assignment}
     T = Float64
 
-    xyzv = fill(T(0), 6 * ceil(Int, Ngalaxies + 3 * √Ngalaxies))  # mean + 3 * stddev
+    num_fields = 6  # 3 pos + 3 vel (+ 1 mass?)
+
+    xyzv = fill(T(0), num_fields * ceil(Int, Ngalaxies + 3 * √Ngalaxies))  # mean + 3 * stddev
     localrange = range_local(deltar)
     Ngalaxies_local_actual = 0
 
@@ -278,9 +280,9 @@ function draw_galaxies_with_velocities(deltar, vx, vy, vz, Navg, Ngalaxies, Δx,
             Nthiscell = pois_rand(rng, Nmean_thiscell)
         end
 
-        g0 = 6 * Ngalaxies_local_actual  # g0 is the index in the xyzv 1D-array
-        if g0 + 6 * Nthiscell > length(xyzv)
-            resize!(xyzv, length(xyzv) + 6*Nthiscell)
+        g0 = num_fields * Ngalaxies_local_actual  # g0 is the index in the xyzv 1D-array
+        if g0 + num_fields * Nthiscell > length(xyzv)
+            resize!(xyzv, length(xyzv) + 7*Nthiscell)
             xyzv[(g0+1):end] .= 0  # in case do_rsd=false
         end
 
@@ -399,14 +401,14 @@ function draw_galaxies_with_velocities(deltar, vx, vy, vz, Navg, Ngalaxies, Δx,
 
             end # else xyzv[4:6] = 0
 
-            g0 += 6
+            g0 += num_fields
         end
 
         Ngalaxies_local_actual += Nthiscell
     end
-    resize!(xyzv, 6 * Ngalaxies_local_actual)
+    resize!(xyzv, num_fields * Ngalaxies_local_actual)
 
-    xyzv_out = reshape(xyzv, 6, :)
+    xyzv_out = reshape(xyzv, num_fields, :)
 
     return xyzv_out
 end
