@@ -492,6 +492,20 @@ function mean_global(arr, comm=MPI.COMM_WORLD)
 end
 
 
+# extrema_global(): Calculate extrema of the given array, taking care of proper
+# handling of distributed arrays such as PencilArrays.
+function extrema_global(arr, comm=MPI.COMM_WORLD)
+    lo, hi = extrema(arr)
+    if MPI.Initialized()
+        lolo = MPI.Allgather(lo, comm)
+        hihi = MPI.Allgather(hi, comm)
+        lo = minimum(lolo)
+        hi = maximum(hihi)
+    end
+    return lo, hi
+end
+
+
 # Fourier transform of a unit sphere.
 function W(x)
     if abs(x) < 2e-1
