@@ -35,7 +35,7 @@ using LinearAlgebra
 using Jacobi: legendre
 
 
-using Splines
+using MySplines
 
 using QuadOsc
 using QuadGK

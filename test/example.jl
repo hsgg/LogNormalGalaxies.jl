@@ -10,7 +10,7 @@ using Revise
 module test_lognormal
 
 using LogNormalGalaxies
-using Splines
+using MySplines
 using MeasurePowerSpectra
 using PythonPlot
 using Random
@@ -46,7 +46,7 @@ function main()
     #Random.seed!(8143083339)
 
     data = readdlm((@__DIR__)*"/matterpower.dat", comments=true)
-    _pk = Spline1D(data[:,1], data[:,2], extrapolation=Splines.powerlaw)
+    _pk = Spline1D(data[:,1], data[:,2], extrapolation=MySplines.powerlaw)
     pkfn(k) = D^2 * _pk(k)
 
     ## choose

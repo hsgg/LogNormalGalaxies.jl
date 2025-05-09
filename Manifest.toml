@@ -2,7 +2,7 @@
 
 julia_version = "1.11.5"
 manifest_format = "2.0"
-project_hash = "f0f1fe257ed9a73b8c5d2033b506d1dfe5da9012"
+project_hash = "63e44e2b1d3dd311ea3d9a5aef73560c75b709c7"
 
 [[deps.AbstractFFTs]]
 deps = ["LinearAlgebra"]
@@ -371,6 +371,11 @@ version = "1.11.0"
 uuid = "14a3606d-f60d-562e-9121-12d972cd8159"
 version = "2023.12.12"
 
+[[deps.MySplines]]
+git-tree-sha1 = "1a5fde189d6d48c2ab4f94ab82bd5d6aca51893f"
+uuid = "b11459bf-4609-2264-00dc-5ebba822f00d"
+version = "1.0.0"
+
 [[deps.NetworkOptions]]
 uuid = "ca575930-c2e3-43a9-ace4-1e988b2c1908"
 version = "1.2.0"
@@ -589,11 +594,6 @@ version = "2.5.1"
 
     [deps.SpecialFunctions.weakdeps]
     ChainRulesCore = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
-
-[[deps.Splines]]
-git-tree-sha1 = "1ac22b85bb09a1725b108119665a9c54d462501f"
-uuid = "59274c38-6050-4eab-b485-1b2b36df4d3b"
-version = "0.2.3"
 
 [[deps.Static]]
 deps = ["CommonWorldInvalidations", "IfElse", "PrecompileTools"]

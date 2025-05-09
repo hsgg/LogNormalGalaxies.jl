@@ -69,10 +69,10 @@ function pk_to_pkG(pkfn)
     #@show r[1],xiG[1:2]
     #@show r[end],xiG[end-4:end]
 
-    xiGfn = Spline1D(r, xiG, extrapolation=Splines.powerlaw)
+    xiGfn = Spline1D(r, xiG, extrapolation=MySplines.powerlaw)
     #xiG2 = @. log1p(xi2)
     #xiG3 = @. log1p(xi3)
-    #xiG3fn = Spline1D(r3, xiG3, extrapolation=Splines.powerlaw)
+    #xiG3fn = Spline1D(r3, xiG3, extrapolation=MySplines.powerlaw)
 
     #figure()
     ##plot(r,xi, "k", label=L"\xi(r)")
@@ -138,7 +138,7 @@ function pk_to_pkG(pkfn)
     #@show k[1], pkG[1]
     #@show k[end], pkG[end]
 
-    pkGfn = Spline1D(k, pkG, extrapolation=Splines.powerlaw)
+    pkGfn = Spline1D(k, pkG, extrapolation=MySplines.powerlaw)
     #@show pkGfn.([0.0, 1e-4])
     return k, pkGfn
 end

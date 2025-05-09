@@ -10,7 +10,7 @@ module lognormals
 
 
 using LogNormalGalaxies
-using Splines
+using MySplines
 using MeasurePowerSpectra
 using PythonPlot
 using Random
@@ -191,10 +191,10 @@ function main(fbase, rfftplanner=LogNormalGalaxies.plan_with_fftw)
     generate = false
 
     #data = readdlm((@__DIR__)*"/matterpower.dat", comments=true)
-    #_pk = Spline1D(data[:,1], data[:,2], extrapolation=Splines.powerlaw)
+    #_pk = Spline1D(data[:,1], data[:,2], extrapolation=MySplines.powerlaw)
     in_k = readdlm(homedir() * "/MeasurePowerSpectra.jl/inputs/kh_camb_z_eff=0.38.csv")[:]
     in_pk = readdlm(homedir() * "/MeasurePowerSpectra.jl/inputs/matter_power_spectrum_pk_camb_z_eff=0.38.csv")[:]
-    _pk = Spline1D(in_k, in_pk, extrapolation=Splines.powerlaw)
+    _pk = Spline1D(in_k, in_pk, extrapolation=MySplines.powerlaw)
 
     pk(k) = D^2 * _pk(k)
 

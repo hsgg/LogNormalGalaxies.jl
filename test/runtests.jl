@@ -9,7 +9,7 @@ using Revise
 
 using Test
 using LogNormalGalaxies
-using Splines
+using MySplines
 using DelimitedFiles
 using Random
 using StableRNGs
@@ -31,7 +31,7 @@ using PkSpectra
         D = 0.82
 
         data = readdlm((@__DIR__)*"/matterpower.dat", comments=true)
-        _pk = Spline1D(data[:,1], data[:,2], extrapolation=Splines.powerlaw)
+        _pk = Spline1D(data[:,1], data[:,2], extrapolation=MySplines.powerlaw)
         pk(k) = D^2 * _pk(k)
 
         nbar = 3e-4
@@ -74,7 +74,7 @@ using PkSpectra
         @show D²
         data = readdlm((@__DIR__)*"/matterpower.dat", comments=true)
         println("data read")
-        _pk = Spline1D(data[:,1], data[:,2], extrapolation=Splines.powerlaw)
+        _pk = Spline1D(data[:,1], data[:,2], extrapolation=MySplines.powerlaw)
         println("data splined")
         pk(k) = D² * _pk(k)
         println("D^2 multiplied")
@@ -89,7 +89,7 @@ using PkSpectra
         pk(k) = 0.0
         #k, pkG = LogNormalGalaxies.pk_to_pkG(pk)
         k = 10.0 .^ (-3:0.01:0)
-        pkG = LogNormalGalaxies.Spline1D(k, pk.(k), extrapolation=Splines.powerlaw)
+        pkG = LogNormalGalaxies.Spline1D(k, pk.(k), extrapolation=MySplines.powerlaw)
         @test pkG(0) == 0
         @test pkG(0.0) == 0
         @test pkG(0.1) == 0
@@ -105,7 +105,7 @@ using PkSpectra
 
     @testset "Cutoff pk" begin
         data = readdlm((@__DIR__)*"/matterpower.dat", comments=true)
-        _pk = Spline1D(data[:,1], data[:,2], extrapolation=Splines.powerlaw)
+        _pk = Spline1D(data[:,1], data[:,2], extrapolation=MySplines.powerlaw)
         k0 = 5e-2
         pk(k) = 0.5^2 * _pk(k) * exp(-(k/k0)^2)
         k, pkG = LogNormalGalaxies.pk_to_pkG(pk)
@@ -146,7 +146,7 @@ using PkSpectra
         # Someone may give other data types than Float64 to the module. Let's be
         # able to handle that.
         data = readdlm((@__DIR__)*"/matterpower.dat")
-        pk0 = Spline1D(data[2:end,1], data[2:end,2], extrapolation=Splines.powerlaw)
+        pk0 = Spline1D(data[2:end,1], data[2:end,2], extrapolation=MySplines.powerlaw)
         pk1 = PkDefault()
 
         # Test any callable

@@ -5,7 +5,7 @@
 
 using Revise
 using LogNormalGalaxies
-using LogNormalGalaxies.Splines
+using LogNormalGalaxies.MySplines
 using MeasurePowerSpectra
 using DelimitedFiles
 using Statistics
@@ -74,7 +74,7 @@ using LinearAlgebra
     #pk(k) = a * k / (c + k^4)
     D = 1.0
     data = readdlm((@__DIR__)*"/matterpower.dat", comments=true)
-    _pk = Spline1D(data[:,1], data[:,2], extrapolation=Splines.powerlaw)
+    _pk = Spline1D(data[:,1], data[:,2], extrapolation=MySplines.powerlaw)
     pkfn(k) = D^2 * _pk(k)
     kin = @. (2 * π / L) * (0:n_sim)
     pk = pkfn.(kin)
