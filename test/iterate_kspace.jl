@@ -5,6 +5,7 @@
 
 using Test
 using LogNormalGalaxies
+using BenchmarkTools
 
 
 @testset "iterate_kspace()" begin
@@ -49,5 +50,15 @@ using LogNormalGalaxies
 
         @test ijk_global == ijk_local .- 1
     end
+
+
+    # test allocation
+    ijk_local = (1,2,3)
+    localrange = [[1,2,3], [1,2,3], [1,2,3]]
+    nxyz = (3,3,3)
+    nxyz2 = (2,2,2)
+    wrap = false
+    n_alloc = @ballocations LogNormalGalaxies.calc_global_indices($ijk_local, $localrange, $nxyz2..., $nxyz...; wrap=$wrap)
+    @test n_alloc == 0
 
 end

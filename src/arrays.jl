@@ -84,16 +84,16 @@ end
 
 
 function iterate_kspace(func, deltak; usethreads=false, first_half_dimension=true, wrap=true)
-    nx, ny, nz = size_global(deltak)
-    nx2 = first_half_dimension ? nx : (div(nx,2) + 1)
-    ny2 = div(ny,2) + 1
-    nz2 = div(nz,2) + 1
+    nxyz = size_global(deltak)
+    nx2 = first_half_dimension ? nxyz[1] : (nxyz[1] ÷ 2 + 1)
+    nxyz2 = (nx2, (@. nxyz[2:end] ÷ 2 + 1)...,)
     localrange = range_local(deltak)
 
     @maybe_threads usethreads for k=1:size(deltak,3)
         for j=1:size(deltak,2), i=1:size(deltak,1)
             ijk_local = (i, j, k)
-            ijk_global = calc_global_indices(ijk_local, localrange, nx2, ny2, nz2, nx, ny, nz; wrap)
+            ijk_global = calc_global_indices(ijk_local, localrange, nxyz2..., nxyz...; wrap)
+            # ijk_global = calc_global_indices(ijk_local, localrange, nxyz2, nxyz; wrap)
             func(ijk_local, ijk_global)
         end
     end
