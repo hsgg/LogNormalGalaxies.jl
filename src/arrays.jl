@@ -58,16 +58,22 @@ PencilFFTs.allocate_input(plan::FFTW.FFTWPlan{T}) where {T} = Array{T}(undef, si
 
 ############### iterate_kspace()
 
-function calc_global_indices(ijk_local, localrange, nx2, ny2, nz2, nx, ny, nz; wrap)
-    ig = localrange[1][ijk_local[1]] - 1  # global index of local index i
-    jg = localrange[2][ijk_local[2]] - 1  # global index of local index j
-    kg = localrange[3][ijk_local[3]] - 1  # global index of local index k
-    if wrap
-        ig = ig < nx2 ? ig : ig-nx
-        jg = jg < ny2 ? jg : jg-ny
-        kg = kg < nz2 ? kg : kg-nz
+function calc_global_indices(ijk_local, localrange, nxyz, nxyz2; wrap)
+    DIMS = length(ijk_local)
+
+    ijk_global = MVector(ijk_local...)
+
+    for d in 1:DIMS
+        ig = localrange[d][ijk_local[d]] - 1  # global index of local index in direction d
+
+        if wrap
+            ig = (ig < nxyz2[d]) ? ig : (ig - nxyz[d])
+        end
+
+        ijk_global[d] = ig
     end
-    return ig, jg, kg
+
+    return (ijk_global...,)
 end
 
 
@@ -89,13 +95,10 @@ function iterate_kspace(func, deltak; usethreads=false, first_half_dimension=tru
     nxyz2 = (nx2, (@. nxyz[2:end] ÷ 2 + 1)...,)
     localrange = range_local(deltak)
 
-    @maybe_threads usethreads for k=1:size(deltak,3)
-        for j=1:size(deltak,2), i=1:size(deltak,1)
-            ijk_local = (i, j, k)
-            ijk_global = calc_global_indices(ijk_local, localrange, nxyz2..., nxyz...; wrap)
-            # ijk_global = calc_global_indices(ijk_local, localrange, nxyz2, nxyz; wrap)
-            func(ijk_local, ijk_global)
-        end
+    @maybe_threads usethreads for ijk in CartesianIndices(deltak)
+        ijk_local = Tuple(ijk)
+        ijk_global = calc_global_indices(ijk_local, localrange, nxyz, nxyz2; wrap)
+        func(ijk_local, ijk_global)
     end
 
     return deltak

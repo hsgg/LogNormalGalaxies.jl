@@ -33,6 +33,7 @@ using Random
 using Strided
 using LinearAlgebra
 using Jacobi: legendre
+using StaticArrays
 
 
 using MySplines
