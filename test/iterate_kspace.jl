@@ -62,4 +62,29 @@ using BenchmarkTools
         @test n_alloc == 0
     end
 
+
+    @testset "1D test" begin
+        Nxy = (17,)
+        deltak = rand(ComplexF64, Nxy...)
+        n_alloc = LogNormalGalaxies.iterate_rspace(deltak) do ij_local, ij_global
+            if ij_local == (1,)
+                @test ij_global == (0,)
+            end
+
+            @test ij_global == ij_local .- 1
+        end
+    end
+
+    @testset "2D test" begin
+        Nxy = (17, 32)
+        deltak = rand(ComplexF64, Nxy...)
+        n_alloc = LogNormalGalaxies.iterate_rspace(deltak) do ij_local, ij_global
+            if ij_local == (1,1)
+                @test ij_global == (0,0)
+            end
+
+            @test ij_global == ij_local .- 1
+        end
+    end
+
 end
