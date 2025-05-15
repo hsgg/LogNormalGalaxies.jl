@@ -38,6 +38,9 @@ using StaticArrays
 
 using MySplines
 
+# for backwards compatibility
+import MySplines as Splines
+
 using QuadOsc
 using QuadGK
 
