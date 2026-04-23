@@ -46,6 +46,8 @@ function main()
     box_center = [0,0,1e8]
     Random.seed!(8143083339)
 
+    kNy_sim = π / L * n_sim
+
     voxel_window_power_sim = 1
     voxel_window_correction_sim = 1
 
@@ -112,7 +114,8 @@ function main()
     # plot
     plotclose("all")  # close previous plots
     figure()
-    axhline(1/nbar, color="0.75")
+    hlines(1/nbar, extrema(km)..., color="0.75")
+    axvline(kNy_sim, color="0.75")
     #plot(km, b^2 .* km.^n.*(pkfn.(km) .+ 1/nbar), "k", label="input \$k^{$n}\\,P(k)\$")
     for m=1:size(pkm,2)
         plot(km, km.^n.*pkm[:,m], "C$(m-1)-", label="\$k^{$n}\\,P_{$(m-1)}(k)\$")
