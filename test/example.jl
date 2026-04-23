@@ -12,11 +12,16 @@ module test_lognormal
 using LogNormalGalaxies
 using MySplines
 using MeasurePowerSpectra
-using PythonPlot
 using Random
 using DelimitedFiles
 #using QuadGK
 #using PlaneParallelRedshiftSpaceDistortions
+
+do_plot = isinteractive()
+
+if do_plot
+    using PythonPlot
+end
 
 
 function Arsd_Kaiser(β, ℓ)
@@ -64,7 +69,7 @@ function main()
 
     ## choose
     # pk = pkfn
-    kin = (2π/L) * (0:n)
+    kin = (2π/L) * (0:n_sim)
     pk = pkfn.(kin)
 
     # generate catalog
@@ -109,24 +114,26 @@ function main()
     pkm_kaiser = @. b^2 * Arsd_Kaiser(β, (0:4)') * pkfn(km)
     pkm_kaiser[:,1] .+= 1 / nbar
 
-    n = 0
 
-    # plot
-    plotclose("all")  # close previous plots
-    figure()
-    hlines(1/nbar, extrema(km)..., color="0.75")
-    axvline(kNy_sim, color="0.75")
-    #plot(km, b^2 .* km.^n.*(pkfn.(km) .+ 1/nbar), "k", label="input \$k^{$n}\\,P(k)\$")
-    for m=1:size(pkm,2)
-        plot(km, km.^n.*pkm[:,m], "C$(m-1)-", label="\$k^{$n}\\,P_{$(m-1)}(k)\$")
-        plot(km, km.^n.*pkm_kaiser[:,m], "C$(m-1)--")
+    if do_plot
+        n = 0
+
+        plotclose("all")  # close previous plots
+        figure()
+        hlines(1/nbar, extrema(km)..., color="0.75")
+        axvline(kNy_sim, color="0.75")
+        #plot(km, b^2 .* km.^n.*(pkfn.(km) .+ 1/nbar), "k", label="input \$k^{$n}\\,P(k)\$")
+        for m=1:size(pkm,2)
+            plot(km, km.^n.*pkm[:,m], "C$(m-1)-", label="\$k^{$n}\\,P_{$(m-1)}(k)\$")
+            plot(km, km.^n.*pkm_kaiser[:,m], "C$(m-1)--")
+        end
+        xlabel("\$k\$")
+        ylabel("\$k\\,P_\\ell(k)\$")
+        xscale("log")
+        #xlim(right=0.6)
+        legend(fontsize="small")
+        savefig((@__DIR__)*"/lognormal.pdf")
     end
-    xlabel(L"k")
-    ylabel(L"k\,P_\ell(k)")
-    xscale("log")
-    #xlim(right=0.6)
-    legend(fontsize="small")
-    savefig((@__DIR__)*"/lognormal.pdf")
 end
 
 

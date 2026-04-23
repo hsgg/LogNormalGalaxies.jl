@@ -282,9 +282,9 @@ using PkSpectra
     ## This meant to be used more interactively:
     #include("lognormals_50sims.jl")
 
-    # @testset "example.jl" begin
-    #     include("example.jl")
-    # end
+    @testset "example.jl" begin
+        include("example.jl")
+    end
 
     # @testset "complenetary_sims.jl" begin
     #     include("complenetary_sims.jl")
