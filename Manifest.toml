@@ -2,7 +2,7 @@
 
 julia_version = "1.12.6"
 manifest_format = "2.0"
-project_hash = "63110a2dacac3580cd0f894f5369f153b3a939af"
+project_hash = "6e8a8340f4980a365f0bf1db4aaa1d3aa77b407f"
 
 [[deps.AbstractFFTs]]
 deps = ["LinearAlgebra"]
@@ -314,7 +314,7 @@ version = "0.3.29"
 deps = ["FFTW", "Jacobi", "LinearAlgebra", "MPI", "MySplines", "PencilFFTs", "PoissonRandom", "Printf", "QuadGK", "QuadOsc", "Random", "StaticArrays", "Statistics", "Strided", "TwoFAST"]
 path = "."
 uuid = "07f92fd4-8b9d-45a1-8a35-bfd730e456b6"
-version = "0.9.4"
+version = "0.9.5"
 
 [[deps.Logging]]
 uuid = "56ddb016-857b-54e1-b83d-db4d58db5568"
