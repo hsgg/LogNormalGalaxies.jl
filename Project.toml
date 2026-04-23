@@ -1,6 +1,6 @@
 name = "LogNormalGalaxies"
 uuid = "07f92fd4-8b9d-45a1-8a35-bfd730e456b6"
-version = "0.9.5"
+version = "0.10.0"
 authors = ["Henry Gebhardt <hsggebhardt@gmail.com>"]
 
 [deps]

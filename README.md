@@ -81,3 +81,9 @@ This is a list of papers using this code:
 4. [Grasshorn Gebhardt & Doré (2024)](https://arxiv.org/abs/2310.17677): SuperFaB Validation on eBOSS
 5. [Benabou & Sands *etal.* (2024)](https://arxiv.org/abs/2404.04811): Perturbative Wide-Angle effects in PS
 6. [Wen *etal.* (2024)](https://arxiv.org/abs/2404.04812): Nonperturbative Wide-Angle effects in PS
+
+
+## News
+
+### v0.10.x
+- Default is to enable voxel window correction.
