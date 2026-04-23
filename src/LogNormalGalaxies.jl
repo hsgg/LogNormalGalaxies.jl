@@ -558,7 +558,7 @@ end
 # their interface.
 
 # simulate galaxies
-function simulate_galaxies(nxyz, Lxyz, nbar, pk, b, faH; rfftplan=default_plan(nxyz), rng=Random.GLOBAL_RNG, voxel_window_power=1, velocity_assignment=1, win=1, sigma_psi=0.0, phase_shift=0.0, fixed_amplitude=false, fixed_phase=false, gather=true, minimize_shotnoise=false, voxel_window_correction=voxel_window_power)
+function simulate_galaxies(nxyz, Lxyz, nbar, pk, b, faH; rfftplan=default_plan(nxyz), rng=Random.GLOBAL_RNG, voxel_window_power=1, velocity_assignment=1, win=1, sigma_psi=0.0, phase_shift=0.0, fixed_amplitude=false, fixed_phase=false, gather=true, minimize_shotnoise=false, voxel_window_correction=0)
     nx, ny, nz = nxyz
     Lx, Ly, Lz = Lxyz
     Volume = Lx * Ly * Lz
