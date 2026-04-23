@@ -539,17 +539,39 @@ function calculate_sigmaGsq(pk, Vcell)
 end
 
 
-function pixel_window!(deltak, nxyz; voxel_window_power=1)
-    if voxel_window_power == 0
+function pixel_window!(deltak, nxyz; voxel_window_correction=1)
+    if voxel_window_correction == 0
         return deltak
     end
-    iterate_kspace(deltak; usethreads=true) do ijk_local, ijk_global
-        Wmesh =  sinc(ijk_global[1] / nxyz[1])
-        Wmesh *= sinc(ijk_global[2] / nxyz[2])
-        Wmesh *= sinc(ijk_global[3] / nxyz[3])
-        Wemsh = Wmesh ^ voxel_window_power
-        deltak[ijk_local...] /= Wmesh  # acting on single δ
+
+    # Precompute separable sinc window per dimension (O(N) instead of O(N^3))
+    localrange = range_local(deltak)
+    nxyz2 = (nxyz[1], nxyz[2] ÷ 2 + 1, nxyz[3] ÷ 2 + 1)
+
+    function sinc_window_1d(d)
+        w = Vector{real(eltype(deltak))}(undef, size(deltak, d))
+        for i in eachindex(w)
+            ig = localrange[d][i] - 1
+            if ig >= nxyz2[d]
+                ig -= nxyz[d]
+            end
+            w[i] = sinc(ig / nxyz[d]) ^ -voxel_window_correction
+        end
+        return w
     end
+
+    wx = sinc_window_1d(1)
+    wy = sinc_window_1d(2)
+    wz = sinc_window_1d(3)
+
+    # Note: We use `r-space` here, because we already did the fft-ordering in
+    # `sinc_window_1d()` above.
+    iterate_rspace(deltak; usethreads=true) do ijk_local, ijk_global
+        i, j, k = ijk_global .+ 1
+        deltak[ijk_local...] *= wx[i] * wy[j] * wz[k]
+    end
+
+    return deltak
 end
 
 
@@ -648,7 +670,7 @@ function simulate_galaxies(nxyz, Lxyz, nbar, pk, b, faH; rfftplan=default_plan(n
     # correct pixel window in k-space
     if voxel_window_correction != 0
         @time mul!(deltakg, rfftplan, deltarg)
-        @time pixel_window!(deltakg, nxyz; voxel_window_power=voxel_window_correction)
+        @time pixel_window!(deltakg, nxyz; voxel_window_correction)
         @time deltarg = rfftplan \ deltakg
     end
     deltakg = nothing
@@ -662,7 +684,7 @@ function simulate_galaxies(nxyz, Lxyz, nbar, pk, b, faH; rfftplan=default_plan(n
 
         println("Calculate deltakm...")
         @time mul!(deltakm, rfftplan, deltarm)
-        @time pixel_window!(deltakm, nxyz; voxel_window_power=voxel_window_correction)
+        @time pixel_window!(deltakm, nxyz; voxel_window_correction)
         #@time @strided @. deltakm *= Volume / (nx*ny*nz)
         deltarm = nothing
 
