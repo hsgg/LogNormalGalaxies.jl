@@ -558,7 +558,7 @@ end
 # their interface.
 
 # simulate galaxies
-function simulate_galaxies(nxyz, Lxyz, nbar, pk, b, faH; rfftplan=default_plan(nxyz), rng=Random.GLOBAL_RNG, voxel_window_power=1, velocity_assignment=1, win=1, sigma_psi=0.0, phase_shift=0.0, fixed_amplitude=false, fixed_phase=false, gather=true, minimize_shotnoise=false)
+function simulate_galaxies(nxyz, Lxyz, nbar, pk, b, faH; rfftplan=default_plan(nxyz), rng=Random.GLOBAL_RNG, voxel_window_power=1, velocity_assignment=1, win=1, sigma_psi=0.0, phase_shift=0.0, fixed_amplitude=false, fixed_phase=false, gather=true, minimize_shotnoise=false, voxel_window_correction=voxel_window_power)
     nx, ny, nz = nxyz
     Lx, Ly, Lz = Lxyz
     Volume = Lx * Ly * Lz
@@ -580,8 +580,6 @@ function simulate_galaxies(nxyz, Lxyz, nbar, pk, b, faH; rfftplan=default_plan(n
     @time deltakg = deepcopy(deltakm)
     scale_by_pk!(deltakm, pk, 1, (kF...,), Volume; rfftplan)
     scale_by_pk!(deltakg, pk, b, (kF...,), Volume; rfftplan)
-    #@time pixel_window!(deltakm, nxyz; voxel_window_power)
-    #@time pixel_window!(deltakg, nxyz; voxel_window_power)
 
     println("Calculate deltar{m,g}...")
     @time deltarm = rfftplan \ deltakm
@@ -592,7 +590,6 @@ function simulate_galaxies(nxyz, Lxyz, nbar, pk, b, faH; rfftplan=default_plan(n
     @time @strided @. deltarg *= (nx*ny*nz) / Volume
     #@show get_rank(),deltarm[1,1,1],mean(deltakm)
     #@show get_rank(),deltarg[1,1,1],mean(deltakg)
-    deltakg = nothing
     # @show mean(deltarm),std(deltarm)
     # @show extrema(deltarm)
     # @show mean(deltarg),std(deltarg)
@@ -648,6 +645,14 @@ function simulate_galaxies(nxyz, Lxyz, nbar, pk, b, faH; rfftplan=default_plan(n
         @show extrema(deltarg)
     end
 
+    # correct pixel window in k-space
+    if voxel_window_correction != 0
+        @time mul!(deltakg, rfftplan, deltarg)
+        @time pixel_window!(deltakg, nxyz; voxel_window_power=voxel_window_correction)
+        @time deltarg = rfftplan \ deltakg
+    end
+    deltakg = nothing
+
     if faH != 0
         # Note: In this section we ignore the Volume/(nx*ny*nz) multiplication
         # because it cancels.
@@ -657,6 +662,7 @@ function simulate_galaxies(nxyz, Lxyz, nbar, pk, b, faH; rfftplan=default_plan(n
 
         println("Calculate deltakm...")
         @time mul!(deltakm, rfftplan, deltarm)
+        @time pixel_window!(deltakm, nxyz; voxel_window_power=voxel_window_correction)
         #@time @strided @. deltakm *= Volume / (nx*ny*nz)
         deltarm = nothing
 

@@ -33,17 +33,28 @@ end
 
 
 function main()
-    b = 1.8
-    f = 0.0
+    b = 1.5
+    f = 0.5
     D = 1.0
 
-    nbar = 3e-4
+    nbar = 1e-4
     L = 2e3
-    n = 256
+    n = 128
+    n_sim = 64
     LLL = [L, L, L]
     nnn = [n, n, n]
-    box_center = [0,0,0]
-    #Random.seed!(8143083339)
+    box_center = [0,0,1e8]
+    Random.seed!(8143083339)
+
+    voxel_window_power_sim = 1
+    voxel_window_correction_sim = 1
+
+    grid_assignment = 4
+    interlacing_order = 1
+    voxel_window_power = 4
+
+    estimator = :xgals_pp
+    #estimator = :Fr_ep
 
     data = readdlm((@__DIR__)*"/matterpower.dat", comments=true)
     _pk = Spline1D(data[:,1], data[:,2], extrapolation=MySplines.powerlaw)
@@ -55,7 +66,7 @@ function main()
     pk = pkfn.(kin)
 
     # generate catalog
-    x⃗, Ψ = simulate_galaxies(nbar, L, pk; nmesh=n, bias=b, f=(f!=0), voxel_window_power=2)
+    x⃗, Ψ = simulate_galaxies(nbar, L, pk; nmesh=n_sim, bias=b, f=(f!=0), voxel_window_power=voxel_window_power_sim, voxel_window_correction=voxel_window_correction_sim)
 
     # add RSD
     los = [0, 0, 1]
@@ -68,20 +79,41 @@ function main()
     sel = @. -L/2 <= x⃗[1,:] <= L/2
     @. sel &= -L/2 <= x⃗[2,:] <= L/2
     @. sel &= -L/2 <= x⃗[3,:] <= L/2
-    x⃗ = x⃗[:,sel]
+    x⃗ = x⃗[:,sel] .+ box_center
     x⃗ = MeasurePowerSpectra.periodic_boundaries!(x⃗, LLL, box_center)
-    km, pkm, nmodes = xgals_to_pkl_planeparallel(x⃗, LLL, nnn, box_center; voxel_window_power=3)
+
+    # Measure power spectrum
+    if estimator == :xgals_pp
+        km, pkm, nmodes = xgals_to_pkl_planeparallel(x⃗, LLL, nnn, box_center;
+            subtract_shotnoise=false, grid_assignment, voxel_window_power)
+    elseif estimator == :Fr_ep
+        Ngalaxies = size(x⃗, 2)
+        Nrandoms = 10 * Ngalaxies
+        xgals = x⃗
+        xrand = LLL .* (rand(3, Nrandoms) .- 1 // 2) .+ box_center
+        ng = calc_number_density(xgals, LLL, nnn, box_center; grid_assignment, interlacing_order)
+        nr = calc_number_density(xrand, LLL, nnn, box_center; grid_assignment, interlacing_order)
+        A = calc_pkl_normalization(ng, nr; alpha1=Ngalaxies/Nrandoms)
+        Fr = calc_deltar(ng, nr, nbar, Nrandoms / Ngalaxies * nbar)
+        km, pkm, nmodes = Fr_to_pkl_endpoint(Fr, Fr, LLL, box_center; ell1=0:4, ell2=0, do_mu_leakage=true, voxel_window_power)
+        pkm .*= nbar^2 / (A * prod(LLL))
+        pkm[:,2:2:end] .*= -im
+    else
+        error("Estimator $estimator not defined.")
+    end
 
     # theory
     β = f / b
     pkm_kaiser = @. b^2 * Arsd_Kaiser(β, (0:4)') * pkfn(km)
+    pkm_kaiser[:,1] .+= 1 / nbar
 
     n = 0
 
     # plot
     plotclose("all")  # close previous plots
     figure()
-    plot(km, b^2 .* km.^n.*pkfn.(km), "k", label="input \$k^{$n}\\,P(k)\$")
+    axhline(1/nbar, color="0.75")
+    #plot(km, b^2 .* km.^n.*(pkfn.(km) .+ 1/nbar), "k", label="input \$k^{$n}\\,P(k)\$")
     for m=1:size(pkm,2)
         plot(km, km.^n.*pkm[:,m], "C$(m-1)-", label="\$k^{$n}\\,P_{$(m-1)}(k)\$")
         plot(km, km.^n.*pkm_kaiser[:,m], "C$(m-1)--")
@@ -89,7 +121,7 @@ function main()
     xlabel(L"k")
     ylabel(L"k\,P_\ell(k)")
     xscale("log")
-    xlim(right=0.6)
+    #xlim(right=0.6)
     legend(fontsize="small")
     savefig((@__DIR__)*"/lognormal.pdf")
 end
