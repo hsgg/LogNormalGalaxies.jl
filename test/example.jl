@@ -42,26 +42,28 @@ function main()
     f = 0.5
     D = 1.0
 
-    nbar = 1e-4
-    L = 2e3
-    n = 128
-    n_sim = 64
+    nbar = 3e-4
+    L = 1e3
+    n = 64
+    n_sim = 128
     LLL = [L, L, L]
     nnn = [n, n, n]
     box_center = [0,0,1e8]
     Random.seed!(8143083339)
+    Random.seed!(1234567)
+    alpha = 0.1
 
-    kNy_sim = π / L * n_sim
+    kNy_sim = π / L * min(n, n_sim)
 
     voxel_window_power_sim = 1
-    voxel_window_correction_sim = 1
+    voxel_window_correction_sim = 0
 
     grid_assignment = 4
     interlacing_order = 1
     voxel_window_power = 4
 
-    estimator = :xgals_pp
-    #estimator = :Fr_ep
+    #estimator = :xgals_pp
+    estimator = :Fr_ep
 
     data = readdlm((@__DIR__)*"/matterpower.dat", comments=true)
     _pk = Spline1D(data[:,1], data[:,2], extrapolation=MySplines.powerlaw)
@@ -95,13 +97,22 @@ function main()
             subtract_shotnoise=false, grid_assignment, voxel_window_power)
     elseif estimator == :Fr_ep
         Ngalaxies = size(x⃗, 2)
-        Nrandoms = 10 * Ngalaxies
+        Nrandoms = round(Int, nbar * prod(LLL) / alpha)
+        #nbar_actual = Ngalaxies / prod(LLL)
+        #alpha_actual = Ngalaxies / Nrandoms
+        nbar_actual = nbar
+        alpha_actual = alpha
         xgals = x⃗
         xrand = LLL .* (rand(3, Nrandoms) .- 1 // 2) .+ box_center
         ng = calc_number_density(xgals, LLL, nnn, box_center; grid_assignment, interlacing_order)
         nr = calc_number_density(xrand, LLL, nnn, box_center; grid_assignment, interlacing_order)
-        A = calc_pkl_normalization(ng, nr; alpha1=Ngalaxies/Nrandoms)
-        Fr = calc_deltar(ng, nr, nbar, Nrandoms / Ngalaxies * nbar)
+        A = calc_pkl_normalization(ng, nr; alpha1=alpha_actual)
+        dVol = prod(LLL ./ nnn)
+        @show Ngalaxies Nrandoms
+        @show sum(ng)*dVol
+        @show sum(nr)*dVol
+        @show nbar_actual alpha_actual
+        Fr = calc_deltar(ng, nr, nbar_actual, nbar_actual / alpha_actual)
         km, pkm, nmodes = Fr_to_pkl_endpoint(Fr, Fr, LLL, box_center; ell1=0:4, ell2=0, do_mu_leakage=true, voxel_window_power)
         pkm .*= nbar^2 / (A * prod(LLL))
         pkm[:,2:2:end] .*= -im
@@ -129,7 +140,7 @@ function main()
         end
         xlabel("\$k\$")
         ylabel("\$k\\,P_\\ell(k)\$")
-        xscale("log")
+        #xscale("log")
         #xlim(right=0.6)
         legend(fontsize="small")
         savefig((@__DIR__)*"/lognormal.pdf")

@@ -314,7 +314,7 @@ version = "0.3.29"
 deps = ["FFTW", "Jacobi", "LinearAlgebra", "MPI", "MySplines", "PencilFFTs", "PoissonRandom", "Printf", "QuadGK", "QuadOsc", "Random", "StaticArrays", "Statistics", "Strided", "TwoFAST"]
 path = "."
 uuid = "07f92fd4-8b9d-45a1-8a35-bfd730e456b6"
-version = "0.10.0"
+version = "0.11.0"
 
 [[deps.Logging]]
 uuid = "56ddb016-857b-54e1-b83d-db4d58db5568"

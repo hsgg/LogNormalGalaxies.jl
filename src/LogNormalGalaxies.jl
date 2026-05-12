@@ -580,7 +580,7 @@ end
 # their interface.
 
 # simulate galaxies
-function simulate_galaxies(nxyz, Lxyz, nbar, pk, b, faH; rfftplan=default_plan(nxyz), rng=Random.GLOBAL_RNG, voxel_window_power=1, velocity_assignment=1, win=1, sigma_psi=0.0, phase_shift=0.0, fixed_amplitude=false, fixed_phase=false, gather=true, minimize_shotnoise=false, voxel_window_correction=voxel_window_power)
+function simulate_galaxies(nxyz, Lxyz, nbar, pk, b, faH; rfftplan=default_plan(nxyz), rng=Random.GLOBAL_RNG, voxel_window_power=1, velocity_assignment=1, win=1, sigma_psi=0.0, phase_shift=0.0, fixed_amplitude=false, fixed_phase=false, gather=true, minimize_shotnoise=false, voxel_window_correction=0)
     nx, ny, nz = nxyz
     Lx, Ly, Lz = Lxyz
     Volume = Lx * Ly * Lz
@@ -629,7 +629,6 @@ function simulate_galaxies(nxyz, Lxyz, nbar, pk, b, faH; rfftplan=default_plan(n
     # @time @strided @. deltarm = exp(deltarm - σGm²/2) - 1
     # @time @strided @. deltarg = exp(deltarg - σGg²/2) - 1
 
-
     # non-allocating version of <e^G>
     @time @strided @. deltarm = exp(deltarm)
     # @show mean_global(deltarm), var_global(deltarm)
@@ -668,10 +667,15 @@ function simulate_galaxies(nxyz, Lxyz, nbar, pk, b, faH; rfftplan=default_plan(n
     end
 
     # correct pixel window in k-space
+    # FIXME: This destroys the property that δ ∈ [-1, ∞). It needs to be done
+    # before transforming to the lognormal field, but then what is the correct
+    # voxel_window_correction?
     if voxel_window_correction != 0
         @time mul!(deltakg, rfftplan, deltarg)
         @time pixel_window!(deltakg, nxyz; voxel_window_correction)
         @time deltarg = rfftplan \ deltakg
+        @show mean(deltarg),std(deltarg)
+        @show extrema(deltarg)
     end
     deltakg = nothing
 
