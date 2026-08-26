@@ -115,6 +115,20 @@ function like_array(arr, x::AbstractArray)
 end
 
 
+# to_host(): The dual of `like_array()`, for the steps that have to run on the
+# CPU. Dispatch is by exclusion, so that no GPU package needs to be named here:
+# ordinary arrays, numbers (the velocity components are literal 0 when there are
+# no redshift-space distortions) and PencilArrays pass through untouched, and
+# anything else is assumed to live on a device and is brought over.
+#
+# PencilArrays must not be converted: the callers derive *global* indices from
+# `range_local()`, which a plain Array would answer wrongly on every rank but 0.
+to_host(x::Number) = x
+to_host(x::Array) = x
+to_host(x::PencilArray) = x
+to_host(x::AbstractArray) = Array(x)
+
+
 ############### functions to extend PencilFFTs ####
 # none!
 

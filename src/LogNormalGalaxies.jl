@@ -879,7 +879,10 @@ function simulate_galaxies(nxyz, Lxyz, nbar, pk, b, faH; rfftplan=default_plan(n
     Ncells = prod(size_global(deltarg))
     Navg = nbar * prod(Δx)
     Ngalaxies = Navg * Ncells * mean_global(win)
-    @time xyzv = draw_galaxies_with_velocities(deltarg, vx, vy, vz, Navg, Ngalaxies, Δx, Val(do_rsd), Val(voxel_window_power), Val(velocity_assignment); rng, minimize_shotnoise)
+    # Drawing galaxies is inherently serial -- Poisson sampling per cell into a
+    # buffer that grows -- and reads the fields cell by cell, so it stays on the
+    # host. to_host() is a no-op for arrays that are already there.
+    @time xyzv = draw_galaxies_with_velocities(to_host(deltarg), to_host(vx), to_host(vy), to_host(vz), Navg, Ngalaxies, Δx, Val(do_rsd), Val(voxel_window_power), Val(velocity_assignment); rng, minimize_shotnoise)
 
     # FoG: sigma_u = f * sigma_psi
     if sigma_psi != 0
