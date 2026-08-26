@@ -51,6 +51,13 @@ end
 # PencilFFTs.jl needs 'allocate_input()', but FFTW doesn't provide it:
 PencilFFTs.allocate_input(plan::FFTW.FFTWPlan{T}) where {T} = Array{T}(undef, size(plan))
 
+# 'allocate_input()' is the one place where the array type of the whole pipeline
+# is decided: 'draw_phases()' calls it once, and every other array is derived
+# from that one by transforming, 'similar()', or 'copy()'. A backend therefore
+# only needs a method here to be usable throughout -- or, if adding a method is
+# undesirable (e.g. because the backend is a test-only dependency), the array
+# can be handed to 'draw_phases(rfftplan; deltar)' directly.
+
 
 ############### element types ####
 

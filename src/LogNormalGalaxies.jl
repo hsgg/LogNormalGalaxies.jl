@@ -111,10 +111,27 @@ end
 
 #################### draw deltak ###########################
 
-function draw_phases(rfftplan; rng=Random.GLOBAL_RNG)
-    deltar = allocate_input(rfftplan)
+@doc raw"""
+    draw_phases(rfftplan; rng=Random.GLOBAL_RNG, deltar=nothing)
+
+Draw a unit-variance Gaussian random field, and return it in Fourier space.
+
+By default the real-space white noise is allocated with
+`allocate_input(rfftplan)` and filled from `rng`. Passing `deltar` supplies
+that array directly instead. This is the single point where the array type of
+the whole pipeline is decided -- everything downstream is derived from it by
+transforming, `similar()`, or `copy()` -- so passing e.g. an `MtlArray` is what
+makes the rest of the pipeline run on a GPU.
+
+The contents of `deltar` are used as given and are not modified, which is how
+two backends can be run on *identical* white noise and compared.
+"""
+function draw_phases(rfftplan; rng=Random.GLOBAL_RNG, deltar=nothing)
+    if isnothing(deltar)
+        deltar = allocate_input(rfftplan)
+        randn!(rng, parent(deltar))
+    end
     #@show size(deltar),length(deltar)
-    randn!(rng, parent(deltar))
     #@show mean(deltar),var_global(deltar)
     #@assert !isnan(mean(deltar))
 
@@ -612,7 +629,7 @@ end
 # their interface.
 
 # simulate galaxies
-function simulate_galaxies(nxyz, Lxyz, nbar, pk, b, faH; rfftplan=default_plan(nxyz), rng=Random.GLOBAL_RNG, voxel_window_power=1, velocity_assignment=1, win=1, sigma_psi=0.0, phase_shift=0.0, fixed_amplitude=false, fixed_phase=false, gather=true, minimize_shotnoise=false, voxel_window_correction=0)
+function simulate_galaxies(nxyz, Lxyz, nbar, pk, b, faH; rfftplan=default_plan(nxyz), rng=Random.GLOBAL_RNG, deltar=nothing, voxel_window_power=1, velocity_assignment=1, win=1, sigma_psi=0.0, phase_shift=0.0, fixed_amplitude=false, fixed_phase=false, gather=true, minimize_shotnoise=false, voxel_window_correction=0)
     nx, ny, nz = nxyz
     Lx, Ly, Lz = Lxyz
     Volume = Lx * Ly * Lz
@@ -620,7 +637,7 @@ function simulate_galaxies(nxyz, Lxyz, nbar, pk, b, faH; rfftplan=default_plan(n
     kF = 2*π ./ Lxyz
 
     println("Draw random phases...")
-    @time deltakm = draw_phases(rfftplan; rng)
+    @time deltakm = draw_phases(rfftplan; rng, deltar)
     T = real(eltype(deltakm))
     @time set_fixed_phase!(deltakm, fixed_phase)
     if phase_shift != 0
