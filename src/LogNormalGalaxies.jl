@@ -618,11 +618,23 @@ function pixel_window!(deltak, nxyz; voxel_window_correction=1)
     wy = sinc_window_1d(2)
     wz = sinc_window_1d(3)
 
-    # Note: We use `r-space` here, because we already did the fft-ordering in
-    # `sinc_window_1d()` above.
-    iterate_rspace(deltak; usethreads=true) do ijk_local, ijk_global
-        i, j, k = ijk_global .+ 1
-        deltak[ijk_local...] *= wx[i] * wy[j] * wz[k]
+    if deltak isa PencilArray
+        # Distributed: go through the index machinery, which knows about both
+        # the local range and the pencil's memory permutation.
+        # Note: We use `r-space` here, because we already did the fft-ordering in
+        # `sinc_window_1d()` above.
+        iterate_rspace(deltak; usethreads=true) do ijk_local, ijk_global
+            i, j, k = ijk_global .+ 1
+            deltak[ijk_local...] *= wx[i] * wy[j] * wz[k]
+        end
+    else
+        # The window is separable, so one fused broadcast against three small
+        # reshaped vectors applies it with no N^3 temporary. Unlike the indexed
+        # loop this also works on a GPU, where scalar indexing is disallowed.
+        wxd = like_array(deltak, wx)
+        wyd = reshape(like_array(deltak, wy), 1, :, 1)
+        wzd = reshape(like_array(deltak, wz), 1, 1, :)
+        @strided @. deltak *= wxd * wyd * wzd
     end
 
     return deltak

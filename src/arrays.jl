@@ -98,6 +98,17 @@ function match_eltype(arr, x::AbstractArray)
 end
 
 
+# like_array(): Put `x` into an array of the same kind as `arr` -- same device,
+# same array type -- keeping `x`'s own element type, which is typically real
+# while `arr` is complex. Small precomputed factors are built on the host, where
+# scalar assignment is allowed, and moved over with this in one go.
+function like_array(arr, x::AbstractArray)
+    y = similar(arr, eltype(x), size(x))
+    copyto!(y, x)
+    return y
+end
+
+
 ############### functions to extend PencilFFTs ####
 # none!
 
