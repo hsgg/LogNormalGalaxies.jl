@@ -52,6 +52,19 @@ end
 PencilFFTs.allocate_input(plan::FFTW.FFTWPlan{T}) where {T} = Array{T}(undef, size(plan))
 
 
+############### element types ####
+
+# match_eltype(): Return `x` with the real element type used by `arr`, so that a
+# user-supplied array (typically Float64) can be fed to a pipeline running at a
+# different precision. Returns `x` itself when no conversion is needed, so the
+# Float64 path is untouched.
+function match_eltype(arr, x::AbstractArray)
+    R = real(eltype(arr))
+    T = eltype(x) <: Complex ? complex(R) : R
+    return eltype(x) === T ? x : convert(AbstractArray{T}, x)
+end
+
+
 ############### functions to extend PencilFFTs ####
 # none!
 

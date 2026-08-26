@@ -60,22 +60,27 @@ using .LinearInterpolations
 
 ######################## misc functions
 
-estimate_memory(N::Integer) = estimate_memory([N,N,N])
+estimate_memory(N::Integer, ::Type{T}=Float64) where {T} = estimate_memory([N,N,N], T)
 
-function estimate_memory(nxyz::Array)
+function estimate_memory(nxyz::Array, ::Type{T}=Float64) where {T}
     nfloats = 9 * prod(nxyz)
-    memory = nfloats * sizeof(Float64)
+    memory = nfloats * sizeof(T)
     return memory
 end
 
 
 # choose fft plan
+#
+# The plan determines both the element type and the array type of the whole
+# pipeline: everything downstream is derived from `allocate_input(rfftplan)` by
+# transforming, `similar()`, or `copy()`. Apple GPUs have no Float64 at all, so
+# supporting Float32 here is what makes a GPU backend possible.
 
-function plan_with_fftw(nxyz; kwargs...)
-    return plan_rfft(Array{Float64}(undef, nxyz...); kwargs...)
+function plan_with_fftw(nxyz, ::Type{T}=Float64; kwargs...) where {T<:AbstractFloat}
+    return plan_rfft(Array{T}(undef, nxyz...); kwargs...)
 end
 
-function plan_with_pencilffts(nxyz; kwargs...)
+function plan_with_pencilffts(nxyz, ::Type{T}=Float64; kwargs...) where {T<:AbstractFloat}
     rank, comm = start_mpi()
 
     proc_dims = MPI.Dims_create(MPI.Comm_size(comm), zeros(Int, 2))
@@ -83,12 +88,24 @@ function plan_with_pencilffts(nxyz; kwargs...)
     transform = Transforms.RFFT()
     @show proc_dims typeof(proc_dims)
 
-    @time rfftplan = PencilFFTPlan((nxyz...,), transform, proc_dims, comm; kwargs...)
+    @time rfftplan = PencilFFTPlan((nxyz...,), transform, proc_dims, comm, T; kwargs...)
     return rfftplan
 end
 
 const default_plan = plan_with_fftw
 #const default_plan = plan_with_pencilffts
+
+
+# The planner may be a ready-made plan, a planner accepting (nxyz, T), or a
+# legacy planner accepting only (nxyz) and fixing its own element type.
+function make_rfftplan(rfftplanner, nxyz, ::Type{T}) where {T}
+    rfftplanner isa Function || return rfftplanner
+    applicable(rfftplanner, nxyz, T) && return rfftplanner(nxyz, T)
+    T === Float64 || throw(ArgumentError(
+        "the given rfftplanner does not accept an element type, so T=$T cannot " *
+        "be requested; pass e.g. `rfftplanner = nxyz -> plan_with_fftw(nxyz, $T)`"))
+    return rfftplanner(nxyz)
+end
 
 
 
@@ -103,7 +120,8 @@ function draw_phases(rfftplan; rng=Random.GLOBAL_RNG)
 
     deltak_phases = rfftplan * deltar
     NNN = prod(size(deltar))
-    @strided @. deltak_phases /= √NNN
+    T = real(eltype(deltak_phases))
+    @strided @. deltak_phases /= T(√NNN)
     #@show mean(deltak_phases)
     #@assert !isnan(mean(deltak_phases))
 
@@ -139,21 +157,30 @@ function scale_by_pk!(deltak, pk, bias, kF, Volume; rfftplan)
 end
 
 
-function scale_by_pk!(deltak, pk::AbstractArray{T,3}, bias, kF, Volume; rfftplan) where {T<:Number}
+function scale_by_pk!(deltak, pk::AbstractArray{Tpk,3}, bias, kF, Volume; rfftplan) where {Tpk<:Number}
     println("  Calculating normal pkG via 3D Fourier transform...")
     @assert length(kF) == 3
+
+    # Every scalar that multiplies an array must be narrowed to the pipeline's
+    # element type. A Float64 scalar would otherwise promote the whole array
+    # back to Float64, which silently defeats T=Float32 and is fatal on a GPU
+    # that has no Float64 at all.
+    T = real(eltype(deltak))
     N3 = prod(size(rfftplan))
     d3k = prod(kF)
-    d3x = Volume / N3
+    d3x = T(Volume / N3)
+    fac = T(N3 * d3k / (2π)^3)
+    biassq = T(bias)^2
+    vol = T(Volume)
 
-    @time @strided xi = rfftplan \ pk .* (N3 * d3k / (2π)^3)
+    @time @strided xi = rfftplan \ match_eltype(deltak, pk) .* fac
 
     # transform to Gaussian field correlation
-    @time @strided @. xi = log1p(bias^2 * xi)
+    @time @strided @. xi = log1p(biassq * xi)
 
     @time @strided pkG = rfftplan * xi .* d3x
 
-    @time @strided @. deltak *= √(pkG * Volume)
+    @time @strided @. deltak *= √(pkG * vol)
 end
 
 
@@ -177,7 +204,9 @@ function scale_by_pk!(deltak, pk::AbstractArray{T,2}, bias, kF, Volume; rfftplan
     @time iterate_kspace(pk3d; usethreads=true) do ijk_local, ijk_global
         n = norm(ijk_global)
 
-        mu = eltype(pk3d)(ijk_global[3] / n)
+        # `pk3d` is complex, so eltype(pk3d) would make mu (and every
+        # legendre(mu, ell) below) needlessly complex.
+        mu = real(eltype(pk3d))(ijk_global[3] / n)
 
         k = round(Int, n) + 1
 
@@ -225,7 +254,7 @@ end
 function set_fixed_phase!(deltak, phase)
     # exp(im*π) does not specialize for irrational
     exp_phase = cos(phase) + im * sin(phase)
-    exp_phase_normed = exp_phase / abs(exp_phase)
+    exp_phase_normed = complex(eltype(deltak))(exp_phase / abs(exp_phase))
     return @strided @. deltak = abs(deltak) * exp_phase_normed
 end
 
@@ -253,7 +282,10 @@ calc_velocity_component!(deltak, kF, coord) = calc_velocity_component!(deltak, (
 function draw_galaxies_with_velocities(deltar, vx, vy, vz, Navg, Ngalaxies, Δx,
         ::Val{do_rsd}, ::Val{voxel_window_power}, ::Val{velocity_assignment};
         rng=Random.GLOBAL_RNG, minimize_shotnoise=false) where {do_rsd,voxel_window_power,velocity_assignment}
-    T = Float64
+    # Only the output buffer follows the field's precision. The position
+    # arithmetic below deliberately stays in Float64: this loop runs on the
+    # host, and a 1 Gpc box in Float32 would only resolve ~6e-5 Mpc.
+    T = real(eltype(deltar))
 
     num_fields = 6  # 3 pos + 3 vel (+ 1 mass?)
 
@@ -589,10 +621,11 @@ function simulate_galaxies(nxyz, Lxyz, nbar, pk, b, faH; rfftplan=default_plan(n
 
     println("Draw random phases...")
     @time deltakm = draw_phases(rfftplan; rng)
+    T = real(eltype(deltakm))
     @time set_fixed_phase!(deltakm, fixed_phase)
     if phase_shift != 0
         # exp(im*π) does not specialize for irrational
-        @time @strided deltakm .*= cos(phase_shift) + im * sin(phase_shift)
+        @time @strided deltakm .*= complex(T)(cos(phase_shift) + im * sin(phase_shift))
     end
     if fixed_amplitude
         @strided @. deltakm /= abs(deltakm)
@@ -608,8 +641,9 @@ function simulate_galaxies(nxyz, Lxyz, nbar, pk, b, faH; rfftplan=default_plan(n
     @time deltarg = rfftplan \ deltakg
     #@show get_rank(),"interim",deltarm[1,1,1],mean(deltakm)
     #@show get_rank(),"interim",deltarg[1,1,1],mean(deltakg)
-    @time @strided @. deltarm *= (nx*ny*nz) / Volume
-    @time @strided @. deltarg *= (nx*ny*nz) / Volume
+    ncells_over_volume = T((nx*ny*nz) / Volume)
+    @time @strided @. deltarm *= ncells_over_volume
+    @time @strided @. deltarg *= ncells_over_volume
     #@show get_rank(),deltarm[1,1,1],mean(deltakm)
     #@show get_rank(),deltarg[1,1,1],mean(deltakg)
     # @show mean(deltarm),std(deltarm)
@@ -750,15 +784,20 @@ end
 
 @doc raw"""
     simulate_galaxies(nbar, Lbox, pk; nmesh=256, bias=1.0, f=false,
-        rfftplanner=default_plan, rng=Random.GLOBAL_RNG, voxel_window_power=1,
-        velocity_assignment=1, win=1, sigma_psi=0.0, phase_shift=0.0,
-        fixed_amplitude=false, fixed_phase=false, gather=true,
+        rfftplanner=default_plan, T=Float64, rng=Random.GLOBAL_RNG,
+        voxel_window_power=1, velocity_assignment=1, win=1, sigma_psi=0.0,
+        phase_shift=0.0, fixed_amplitude=false, fixed_phase=false, gather=true,
         minimize_shotnoise=false)
 
 Simulate galaxies using log-normal statistics.
+
+`T` selects the floating point type of the density and velocity fields, and
+hence of the returned positions and velocities. It is forwarded to
+`rfftplanner`, which may also be given a ready-made plan instead. Note that
+`Float32` resolves a 1 Gpc box to only ~6e-5 Mpc.
 """
 function simulate_galaxies(nbar, Lbox, pk; nmesh=256, bias=1.0, f=false,
-        rfftplanner=default_plan, kwargs...)
+        rfftplanner=default_plan, T=Float64, kwargs...)
 
     if nmesh isa Number
         nxyz = nmesh, nmesh, nmesh
@@ -772,16 +811,14 @@ function simulate_galaxies(nbar, Lbox, pk; nmesh=256, bias=1.0, f=false,
         Lxyz = Lbox
     end
 
-    @time if rfftplanner isa Function
-        rfftplan = rfftplanner(nxyz)
-    else
-        rfftplan = rfftplanner
-    end
+    @time rfftplan = make_rfftplan(rfftplanner, nxyz, T)
 
     @time xyzv = simulate_galaxies(nxyz, Lxyz, nbar, pk, bias, f;
                                    rfftplan, kwargs...)
     println("Post-processing...")
-    @time xyz = @. xyzv[1:3,:] - Lbox / 2
+    # narrowed so that this allocating broadcast cannot promote xyz back to Float64
+    box_shift = real(eltype(xyzv)).(Lbox ./ 2)
+    @time xyz = @. xyzv[1:3,:] - box_shift
     @time v = xyzv[4:6,:]
 
     return collect(xyz), collect(v)
