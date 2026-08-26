@@ -917,9 +917,22 @@ Simulate galaxies using log-normal statistics.
 hence of the returned positions and velocities. It is forwarded to
 `rfftplanner`, which may also be given a ready-made plan instead. Note that
 `Float32` resolves a 1 Gpc box to only ~6e-5 Mpc.
+
+`deltar` supplies the real-space array to draw the white noise into. Since
+every other array in the pipeline is derived from it, passing one selects the
+element type *and* the array type of the whole simulation. So to run on an
+Apple GPU, which has no `Float64` at all:
+
+```julia
+using Metal
+simulate_galaxies(nbar, Lbox, pk; nmesh, deltar=MtlArray{Float32}(undef, nmesh, nmesh, nmesh))
+```
+
+Drawing the galaxies themselves is serial and always runs on the CPU; the
+fields are copied back for it.
 """
 function simulate_galaxies(nbar, Lbox, pk; nmesh=256, bias=1.0, f=false,
-        rfftplanner=default_plan, T=Float64, kwargs...)
+        rfftplanner=default_plan, T=Float64, deltar=nothing, kwargs...)
 
     if nmesh isa Number
         nxyz = nmesh, nmesh, nmesh
@@ -933,10 +946,18 @@ function simulate_galaxies(nbar, Lbox, pk; nmesh=256, bias=1.0, f=false,
         Lxyz = Lbox
     end
 
-    @time rfftplan = make_rfftplan(rfftplanner, nxyz, T)
+    @time rfftplan = if isnothing(deltar) || rfftplanner !== default_plan
+        make_rfftplan(rfftplanner, nxyz, T)
+    else
+        # The caller gave us the real-space array but no planner of their own, so
+        # take the element type *and* the backend from that array. This is what
+        # makes running elsewhere a single keyword, e.g.
+        #     simulate_galaxies(...; deltar=MtlArray{Float32}(undef, nxyz...))
+        plan_rfft(deltar)
+    end
 
     @time xyzv = simulate_galaxies(nxyz, Lxyz, nbar, pk, bias, f;
-                                   rfftplan, kwargs...)
+                                   rfftplan, deltar, kwargs...)
     println("Post-processing...")
     # narrowed so that this allocating broadcast cannot promote xyz back to Float64
     box_shift = real(eltype(xyzv)).(Lbox ./ 2)
