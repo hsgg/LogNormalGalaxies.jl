@@ -283,16 +283,65 @@ end
 
 ################## calc velocities ###########################
 
+@doc raw"""
+    kgrid_1d(deltak, kF, d)
+
+The wavenumbers along dimension `d` of the k-space array `deltak`, in FFT order
+and in `deltak`'s real element type.
+
+Narrowing to that element type here, on the host, is deliberate: the products
+below then never involve `Float64`, which a GPU may not support at all. Note
+that `sqrt(::Int)` is `Float64`, so leaving the integer wavenumbers to be
+squared on the device would reintroduce it.
+"""
+function kgrid_1d(deltak, kF, d)
+    nxyz = size_global(deltak)
+    localrange = range_local(deltak)
+    # matches iterate_kspace(; first_half_dimension=true): dimension 1 holds the
+    # non-negative half of the rfft, the others wrap to negative frequencies
+    nd2 = d == 1 ? nxyz[1] : (nxyz[d] ÷ 2 + 1)
+
+    k = Vector{real(eltype(deltak))}(undef, size(deltak, d))
+    for i in eachindex(k)
+        ig = localrange[d][i] - 1
+        ig = ig < nd2 ? ig : ig - nxyz[d]
+        k[i] = kF[d] * ig
+    end
+    return k
+end
+
+
+# δ(k⃗) ↦ i k_coord / |k⃗|² δ(k⃗), and 0 at k⃗ = 0. The grouping matches the
+# original scalar loop so that Float64 results stay bit-identical.
+@inline function _velocity_component(d, kx, ky, kz, kc)
+    kmode2 = kx^2 + ky^2 + kz^2
+    return iszero(kmode2) ? zero(d) : d * (im * kc / kmode2)
+end
+
+
 function calc_velocity_component!(deltak, kF::Tuple, coord)
-    iterate_kspace(deltak; usethreads=true) do ijk_local,ijk_global
-        kvec = kF .* ijk_global
-        kx, ky, kz = kvec
-        kmode2 = kx^2 + ky^2 + kz^2
-        if kmode2 == 0
-            deltak[ijk_local...] = 0
-        else
-            deltak[ijk_local...] *= im * kvec[coord] / kmode2
+    if deltak isa PencilArray
+        # Distributed: needs the index machinery for the local range and the
+        # pencil's memory permutation.
+        iterate_kspace(deltak; usethreads=true) do ijk_local,ijk_global
+            kvec = kF .* ijk_global
+            kx, ky, kz = kvec
+            kmode2 = kx^2 + ky^2 + kz^2
+            if kmode2 == 0
+                deltak[ijk_local...] = 0
+            else
+                deltak[ijk_local...] *= im * kvec[coord] / kmode2
+            end
         end
+    else
+        # |k⃗|² is separable, so three small reshaped vectors and one fused
+        # broadcast do this with no N^3 temporary, and without the scalar
+        # indexing that a GPU disallows.
+        kx = like_array(deltak, kgrid_1d(deltak, kF, 1))
+        ky = reshape(like_array(deltak, kgrid_1d(deltak, kF, 2)), 1, :, 1)
+        kz = reshape(like_array(deltak, kgrid_1d(deltak, kF, 3)), 1, 1, :)
+        kc = (kx, ky, kz)[coord]
+        @strided @. deltak = _velocity_component(deltak, kx, ky, kz, kc)
     end
     return deltak
 end
