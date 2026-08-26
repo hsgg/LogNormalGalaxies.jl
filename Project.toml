@@ -40,7 +40,9 @@ StaticArrays = "1"
 Statistics = "1"
 Strided = "2.5"
 TwoFAST = "0.1"
-julia = "^1.7"
+# Strided 2.5, needed for GPU-safe @strided, requires 1.10 -- and 1.10 is what
+# CI's `lts` entry uses anyway.
+julia = "1.10"
 
 [extras]
 AbstractFFTs = "621f4979-c628-5d54-868e-fcf4e3e8185c"
