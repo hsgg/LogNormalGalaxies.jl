@@ -215,13 +215,19 @@ function scale_by_pk!(deltak, pk::AbstractArray{Tpk,3}, bias, kF, Volume; rfftpl
     biassq = T(bias)^2
     vol = T(Volume)
 
-    pk_matched = match_eltype(deltak, pk)  # hoisted out of @strided, see src/arrays.jl
-    @time @strided xi = rfftplan \ pk_matched .* fac
+    # Note: the transforms are kept out of the `@strided` expressions. `@strided`
+    # would wrap their argument in a StridedView, which an FFT plan does not
+    # recognise -- on a GPU it then falls back to a generic implementation that
+    # indexes element by element and raises "scalar indexing is disallowed".
+    pk_matched = match_eltype(deltak, pk)
+    @time xi = rfftplan \ pk_matched
+    @strided @. xi *= fac
 
     # transform to Gaussian field correlation
     @time @strided @. xi = log1p(biassq * xi)
 
-    @time @strided pkG = rfftplan * xi .* d3x
+    @time pkG = rfftplan * xi
+    @strided @. pkG *= d3x
 
     @time @strided @. deltak *= √(pkG * vol)
 end
@@ -305,7 +311,8 @@ function set_fixed_phase!(deltak, phase)
     # exp(im*π) does not specialize for irrational
     exp_phase = cos(phase) + im * sin(phase)
     exp_phase_normed = complex(eltype(deltak))(exp_phase / abs(exp_phase))
-    return @strided @. deltak = abs(deltak) * exp_phase_normed
+    @strided @. deltak = abs(deltak) * exp_phase_normed
+    return deltak  # not the StridedView that @strided would otherwise return
 end
 
 
