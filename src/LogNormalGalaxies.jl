@@ -156,14 +156,35 @@ function multiply_by_pkG!(deltak, pkG, kF, Volume)
     # This function only exists so that pkG is type-stable within
     # `iterate_kspace()`.
 
-    @time iterate_kspace(deltak; usethreads=false) do ijk_local,ijk_global
-        kx, ky, kz = kF .* ijk_global
+    if deltak isa PencilArray
+        @time iterate_kspace(deltak; usethreads=false) do ijk_local,ijk_global
+            kx, ky, kz = kF .* ijk_global
 
-        kmode = √(kx^2 + ky^2 + kz^2)
+            kmode = √(kx^2 + ky^2 + kz^2)
 
-        pkG_mode = pkG(kmode)  # not thread-safe
+            pkG_mode = pkG(kmode)  # not thread-safe
 
-        deltak[ijk_local...] *= √(pkG_mode * Volume)
+            deltak[ijk_local...] *= √(pkG_mode * Volume)
+        end
+    else
+        # pkG is a spline over host arrays, so the amplitude has to be evaluated
+        # on the host regardless. Collect it into a plain array and then apply it
+        # with a single broadcast, which is also what lets this -- the callable
+        # pk path, and hence the package's primary interface -- run on a GPU.
+        amp = Array{real(eltype(deltak))}(undef, size(deltak))
+
+        @time iterate_kspace(amp; usethreads=false) do ijk_local,ijk_global
+            kx, ky, kz = kF .* ijk_global
+
+            kmode = √(kx^2 + ky^2 + kz^2)
+
+            pkG_mode = pkG(kmode)  # not thread-safe
+
+            amp[ijk_local...] = √(pkG_mode * Volume)
+        end
+
+        ampd = like_array(deltak, amp)
+        @strided @. deltak *= ampd
     end
 
     return deltak
@@ -221,7 +242,13 @@ end
 function scale_by_pk!(deltak, pk::AbstractArray{T,2}, bias, kF, Volume; rfftplan) where {T<:Number}
     lmax = size(pk, 2) - 1
 
-    pk3d = similar(deltak)
+    # Unlike the other k-space operations this one is a gather: it looks pk up at
+    # a radial bin computed per mode, so it is neither elementwise nor separable
+    # and does not reduce to a broadcast. It also runs once per simulation. So
+    # build it on the host -- where `pk` already lives and scalar assignment is
+    # allowed -- and move the result across in one go.
+    pk3d = deltak isa PencilArray ? similar(deltak) :
+           Array{eltype(deltak)}(undef, size(deltak))
 
     @time iterate_kspace(pk3d; usethreads=true) do ijk_local, ijk_global
         n = norm(ijk_global)
@@ -237,10 +264,11 @@ function scale_by_pk!(deltak, pk::AbstractArray{T,2}, bias, kF, Volume; rfftplan
         pk3d[ijk_local...] = p
     end
 
+    # n == 0 above gives mu = 0/0 = NaN, so the DC mode must be set here.
     pk3d[1,1,1] = pk[1,1]
 
     # Note: bias will be applied here:
-    scale_by_pk!(deltak, pk3d, bias, kF, Volume; rfftplan)
+    scale_by_pk!(deltak, like_array(deltak, pk3d), bias, kF, Volume; rfftplan)
 end
 
 

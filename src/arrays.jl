@@ -102,6 +102,12 @@ end
 # same array type -- keeping `x`'s own element type, which is typically real
 # while `arr` is complex. Small precomputed factors are built on the host, where
 # scalar assignment is allowed, and moved over with this in one go.
+# No-ops for the cases where the caller already built `x` as the right kind of
+# array: a host Array for a host destination, or a PencilArray made with
+# similar(). Going through similar()+copyto! for a PencilArray would in fact be
+# wrong, since its size() is only the process-local part.
+like_array(arr::Array, x::AbstractArray) = x
+like_array(arr::PencilArray, x::PencilArray) = x
 function like_array(arr, x::AbstractArray)
     y = similar(arr, eltype(x), size(x))
     copyto!(y, x)
