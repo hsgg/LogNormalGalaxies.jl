@@ -138,7 +138,11 @@ function draw_phases(rfftplan; rng=Random.GLOBAL_RNG, deltar=nothing)
     deltak_phases = rfftplan * deltar
     NNN = prod(size(deltar))
     T = real(eltype(deltak_phases))
-    @strided @. deltak_phases /= T(√NNN)
+    # Hoisted: `@strided` captures its expression lazily into a kernel argument,
+    # so a type conversion written inline would carry a DataType onto the
+    # device, which is not a bitstype and fails to compile. See src/arrays.jl.
+    norm_factor = T(√NNN)
+    @strided @. deltak_phases /= norm_factor
     #@show mean(deltak_phases)
     #@assert !isnan(mean(deltak_phases))
 
@@ -190,7 +194,8 @@ function scale_by_pk!(deltak, pk::AbstractArray{Tpk,3}, bias, kF, Volume; rfftpl
     biassq = T(bias)^2
     vol = T(Volume)
 
-    @time @strided xi = rfftplan \ match_eltype(deltak, pk) .* fac
+    pk_matched = match_eltype(deltak, pk)  # hoisted out of @strided, see src/arrays.jl
+    @time @strided xi = rfftplan \ pk_matched .* fac
 
     # transform to Gaussian field correlation
     @time @strided @. xi = log1p(biassq * xi)
@@ -642,7 +647,8 @@ function simulate_galaxies(nxyz, Lxyz, nbar, pk, b, faH; rfftplan=default_plan(n
     @time set_fixed_phase!(deltakm, fixed_phase)
     if phase_shift != 0
         # exp(im*π) does not specialize for irrational
-        @time @strided deltakm .*= complex(T)(cos(phase_shift) + im * sin(phase_shift))
+        exp_phase_shift = complex(T)(cos(phase_shift) + im * sin(phase_shift))  # hoisted, see src/arrays.jl
+        @time @strided deltakm .*= exp_phase_shift
     end
     if fixed_amplitude
         @strided @. deltakm /= abs(deltakm)

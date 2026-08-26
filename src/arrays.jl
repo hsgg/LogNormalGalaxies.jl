@@ -25,6 +25,32 @@ Base.deepcopy(pa::PencilArray) = PencilArray(pencil(pa), deepcopy(parent(pa)))
 Strided.StridedView(a::PencilArray) = Strided.StridedView(parent(a))  # FIXME: incomplete if there are permutations. To fix, need to figure out how to get the permutated view. However, this should only matter for things like matrix multiplication, where it is NOT just element-wise.
 
 
+############### using @strided with GPU arrays ####
+#
+# Strided.jl works on GPU arrays from v2.5 on: StridedGPUArraysExt is keyed on
+# GPUArrays (which every GPU backend depends on) so it loads by itself, and from
+# v2.5 an allocating `@strided` broadcast allocates its result with
+# `similar(parent, ...)`, keeping it on the device. Earlier 2.x allocated a host
+# Array instead, which would silently mix a host destination with device
+# sources, hence the compat lower bound.
+#
+# One rule has to be respected at the call sites: `@strided` does not evaluate
+# its expression, it captures it into a `Strided.CaptureArgs` tree that is
+# passed to the kernel as an argument. Anything that is not a bitstype
+# therefore cannot appear inside the expression. In particular a type
+# conversion written inline,
+#
+#     @strided @. deltak /= T(√NNN)          # T is a DataType => not isbits
+#
+# fails to compile with "passing non-bitstype argument". Compute such scalars
+# into a local first and reference the local:
+#
+#     norm_factor = T(√NNN)
+#     @strided @. deltak /= norm_factor
+#
+# Plain functions are fine, since they are singletons: `√(pkG * vol)` compiles.
+
+
 ############### functions to extend base Arrays ####
 
 # this is *un*like 'size_local()', because a pencil also has info about the
