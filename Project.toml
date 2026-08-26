@@ -25,6 +25,10 @@ FFTW = "1"
 Jacobi = "0.7"
 LinearAlgebra = "1"
 MPI = "0.20"
+# test-only; Metal >= 1.10 is the first version with an AbstractFFTs
+# implementation (rfft/irfft). It needs julia >= 1.10 and macOS >= 14, but
+# since it is only in the test target the package's own floor stays put.
+Metal = "1.10"
 MySplines = "0.2, 1"
 PencilFFTs = "0.14, 0.15"
 PoissonRandom = "0.4"
@@ -39,9 +43,11 @@ TwoFAST = "0.1"
 julia = "^1.7"
 
 [extras]
+AbstractFFTs = "621f4979-c628-5d54-868e-fcf4e3e8185c"
 BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
 DelimitedFiles = "8bb1440f-4735-579b-a4ab-409b98df4dab"
 MeasurePowerSpectra = "74159778-d4a3-4c31-b0f7-baeaee79979b"
+Metal = "dde4c033-4e86-420c-a63e-0dd931031962"
 PkSpectra = "d088b444-fe12-4774-80f8-19c84f050eda"
 PlaneParallelRedshiftSpaceDistortions = "69942907-cdcb-4e72-88f5-c4156138b8a7"
 PythonPlot = "274fc56d-3b97-40fa-a1cd-1b4a50311bf9"
@@ -50,4 +56,4 @@ StableRNGs = "860ef19b-820b-49d6-a774-d7a799459cd3"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["BenchmarkTools", "DelimitedFiles", "MeasurePowerSpectra", "PkSpectra", "PlaneParallelRedshiftSpaceDistortions", "PythonPlot", "Revise", "StableRNGs", "Test"]
+test = ["AbstractFFTs", "BenchmarkTools", "DelimitedFiles", "MeasurePowerSpectra", "Metal", "PkSpectra", "PlaneParallelRedshiftSpaceDistortions", "PythonPlot", "Revise", "StableRNGs", "Test"]

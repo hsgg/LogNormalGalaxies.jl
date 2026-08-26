@@ -230,6 +230,8 @@ function scale_by_pk!(deltak, pk::AbstractArray{Tpk,3}, bias, kF, Volume; rfftpl
     @strided @. pkG *= d3x
 
     @time @strided @. deltak *= √(pkG * vol)
+
+    return deltak  # not the StridedView that @strided would otherwise return
 end
 
 
