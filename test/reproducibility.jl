@@ -64,6 +64,10 @@ function reproducibility_cases()
     push!(cases, "pk2d" => () -> simulate_galaxies(nbar, L, pk2d; common...,
             f=true, rng=StableRNG(REPRO_SEED)))
 
+    fog = (; common..., sigma_psi=3.0)  # the later entry wins over the splat
+    push!(cases, "callable rsd=true vwc=0 sigma_psi" => () -> simulate_galaxies(nbar, L, pkfn;
+            fog..., f=true, rng=StableRNG(REPRO_SEED), voxel_window_correction=0))
+
     return cases
 end
 

@@ -888,9 +888,10 @@ function simulate_galaxies(nxyz, Lxyz, nbar, pk, b, faH; rfftplan=default_plan(n
 
     # FoG: sigma_u = f * sigma_psi
     if sigma_psi != 0
-        @. xyzv[4,:] += sigma_psi * randn()
-        @. xyzv[5,:] += sigma_psi * randn()
-        @. xyzv[6,:] += sigma_psi * randn()
+        sigma_psi_T = T(sigma_psi)
+        @. xyzv[4,:] += sigma_psi_T * randn(rng, T)
+        @. xyzv[5,:] += sigma_psi_T * randn(rng, T)
+        @. xyzv[6,:] += sigma_psi_T * randn(rng, T)
     end
 
     if faH != 1 && faH != 0
