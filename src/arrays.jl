@@ -51,6 +51,20 @@ end
 # PencilFFTs.jl needs 'allocate_input()', but FFTW doesn't provide it:
 PencilFFTs.allocate_input(plan::FFTW.FFTWPlan{T}) where {T} = Array{T}(undef, size(plan))
 
+############### element types ####
+
+# like_array(): Return `x` at `arr`'s precision, keeping `x`'s own realness, so
+# that a real window or power spectrum stays real against a complex field. A
+# user-supplied array is typically Float64 and must be narrowed to the precision
+# the pipeline runs at. `convert` is the identity when the type already matches,
+# so the Float64 path is untouched.
+
+# the precision from `arr`, the realness from `x`
+match_precision_type(arr, x) = (R = real(eltype(arr)); eltype(x) <: Complex ? complex(R) : R)
+
+like_array(arr, x::AbstractArray) =
+    convert(AbstractArray{match_precision_type(arr, x)}, x)
+
 
 ############### functions to extend PencilFFTs ####
 # none!
