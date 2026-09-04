@@ -28,6 +28,14 @@ selected(name) = isempty(ARGS) || name in ARGS
     selected("reproducibility") && include("reproducibility.jl")
     selected("float32") && include("float32.jl")
 
+    # GPU tests are opt-in. CI is ubuntu-latest/x64, and GitHub's macOS runners
+    # have no usable Metal GPU either, so this only ever runs on a developer
+    # machine. `using` cannot appear inside an `if`, hence the guarded include.
+    if selected("metal") && Sys.isapple() && Sys.ARCH == :aarch64 &&
+            get(ENV, "LNG_TEST_GPU", "0") == "1"
+        include("metal.jl")
+    end
+
     selected("compile") && @testset "Compile and load $rfftplanner" for rfftplanner=[LogNormalGalaxies.plan_with_fftw,LogNormalGalaxies.plan_with_pencilffts]
         @show rfftplanner
         if Sys.ARCH == :aarch64 && rfftplanner == LogNormalGalaxies.plan_with_pencilffts
