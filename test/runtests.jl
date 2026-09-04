@@ -17,9 +17,17 @@ using BenchmarkTools
 using PkSpectra
 
 
+# Run a subset of the suite by name, e.g.
+#     julia --project -e 'using Pkg; Pkg.test(test_args=["reproducibility"])'
+# With no arguments the whole suite runs.
+selected(name) = isempty(ARGS) || name in ARGS
+
+
 @testset verbose=true "LogNormalGalaxies" begin
 
-    @testset "Compile and load $rfftplanner" for rfftplanner=[LogNormalGalaxies.plan_with_fftw,LogNormalGalaxies.plan_with_pencilffts]
+    selected("reproducibility") && include("reproducibility.jl")
+
+    selected("compile") && @testset "Compile and load $rfftplanner" for rfftplanner=[LogNormalGalaxies.plan_with_fftw,LogNormalGalaxies.plan_with_pencilffts]
         @show rfftplanner
         if Sys.ARCH == :aarch64 && rfftplanner == LogNormalGalaxies.plan_with_pencilffts
             @test_skip "Skipping PencilFFTs on ARM64"
@@ -48,7 +56,7 @@ using PkSpectra
     end
 
 
-    @testset "Random phases" begin
+    selected("phases") && @testset "Random phases" begin
         function create_randn(n, rfftplanner)
             rfftplan = rfftplanner([n,n,n])
             deltar = LogNormalGalaxies.allocate_input(rfftplan)
@@ -70,7 +78,7 @@ using PkSpectra
     end
 
 
-    @testset "pk_to_pkG(D²=$D²)" for D²=[0.1,1.0]
+    selected("pk_to_pkG") && @testset "pk_to_pkG(D²=$D²)" for D²=[0.1,1.0]
         @show D²
         data = readdlm((@__DIR__)*"/matterpower.dat", comments=true)
         println("data read")
@@ -85,7 +93,7 @@ using PkSpectra
     end
 
 
-    @testset "Zero pk" begin
+    selected("zero_pk") && @testset "Zero pk" begin
         pk(k) = 0.0
         #k, pkG = LogNormalGalaxies.pk_to_pkG(pk)
         k = 10.0 .^ (-3:0.01:0)
@@ -103,7 +111,7 @@ using PkSpectra
     end
 
 
-    @testset "Cutoff pk" begin
+    selected("cutoff_pk") && @testset "Cutoff pk" begin
         data = readdlm((@__DIR__)*"/matterpower.dat", comments=true)
         _pk = Spline1D(data[:,1], data[:,2], extrapolation=MySplines.powerlaw)
         k0 = 5e-2
@@ -113,7 +121,7 @@ using PkSpectra
     end
 
 
-    @testset "draw_galaxies_with_velocities()" begin
+    selected("draw_galaxies") && @testset "draw_galaxies_with_velocities()" begin
         # The function 'draw_galaxies_with_velocities()' is a performance bottleneck.
         nnn = 128, 128, 128
         deltar = randn(nnn...)
@@ -130,7 +138,7 @@ using PkSpectra
     end
 
 
-    @testset "Array deepcopy" begin
+    selected("deepcopy") && @testset "Array deepcopy" begin
         nxyz = (2, 2, 2)
         rfftplan = LogNormalGalaxies.plan_with_pencilffts(nxyz)
         x = LogNormalGalaxies.allocate_input(rfftplan)
@@ -141,7 +149,7 @@ using PkSpectra
     end
 
 
-    @testset verbose=true "Any spline" begin
+    selected("any_spline") && @testset verbose=true "Any spline" begin
         println("Test any typed spline:")
         # Someone may give other data types than Float64 to the module. Let's be
         # able to handle that.
@@ -172,7 +180,7 @@ using PkSpectra
     end
 
 
-    @testset "3D-Array pk" begin
+    selected("array_pk") && @testset "3D-Array pk" begin
         println("Test array typed pk:")
         nbar = 3e-4
         L = 100.0
@@ -188,7 +196,7 @@ using PkSpectra
     end
 
 
-    @testset "2D-Array pk" begin
+    selected("array_pk") && @testset "2D-Array pk" begin
         println("Test array typed pk:")
         nbar = 3e-4
         L = 100.0
@@ -205,7 +213,7 @@ using PkSpectra
     end
 
 
-    @testset "1D-Array pk" begin
+    selected("array_pk") && @testset "1D-Array pk" begin
         println("Test array typed pk:")
         nbar = 3e-4
         L = 100.0
@@ -221,7 +229,7 @@ using PkSpectra
     end
 
 
-    @testset "Reproducibility, (rsd, vox_corr)=($rsd, $voxel_window_correction)" for (rsd, voxel_window_correction)=[
+    selected("reproducibility_old") && @testset "Reproducibility, (rsd, vox_corr)=($rsd, $voxel_window_correction)" for (rsd, voxel_window_correction)=[
             (false, 0),
             (false, 1),
             (true, 0),
@@ -275,14 +283,14 @@ using PkSpectra
     end
 
 
-    include("apply_rsd.jl")
-    include("iterate_kspace.jl")
+    selected("apply_rsd") && include("apply_rsd.jl")
+    selected("iterate_kspace") && include("iterate_kspace.jl")
 
 
     ## This meant to be used more interactively:
     #include("lognormals_50sims.jl")
 
-    @testset "example.jl" begin
+    selected("example") && @testset "example.jl" begin
         include("example.jl")
     end
 
