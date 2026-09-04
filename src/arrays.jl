@@ -107,6 +107,14 @@ match_precision_type(arr, x) = (R = real(eltype(arr)); eltype(x) <: Complex ? co
 like_array(arr::Array, x::AbstractArray) =
     convert(AbstractArray{match_precision_type(arr, x)}, x)
 
+# a PencilArray keeps its pencil -- rebuilding one from size() would be wrong,
+# since that is only the process-local block
+function like_array(arr::PencilArray, x::PencilArray)
+    T = match_precision_type(arr, x)
+    eltype(x) === T && return x
+    return PencilArray(pencil(x), convert(AbstractArray{T}, parent(x)))
+end
+
 # and its parent is where broadcasting and `@strided` actually put the factors
 like_array(arr::PencilArray, x::AbstractArray) = like_array(parent(arr), x)
 
@@ -117,6 +125,16 @@ function like_array(arr, x::AbstractArray)
     copyto!(z, y)
     return z
 end
+
+
+# similar_local(): an uninitialized array with `arr`'s local block shape and
+# index semantics, but on the host unless `arr` is distributed. For the k-space
+# gathers, which must be built by scalar assignment: a PencilArray has to stay
+# one (`iterate_kspace()` reads its `range_local()` for global indices), while a
+# device array becomes a plain Array that `like_array()` moves back.
+similar_local(arr, ::Type{T}) where {T} = Array{T}(undef, size(arr)...)
+similar_local(arr::PencilArray, ::Type{T}) where {T} = similar(arr, T)
+similar_local(arr) = similar_local(arr, eltype(arr))
 
 
 # memory_dim(): where logical dimension `d` of `arr` lives in memory order.

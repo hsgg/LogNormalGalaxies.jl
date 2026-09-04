@@ -156,16 +156,25 @@ end
 function multiply_by_pkG!(deltak, pkG, kF, Volume)
     # This function only exists so that pkG is type-stable within
     # `iterate_kspace()`.
+    #
+    # The amplitude √(P_G(|k⃗|)·V) is a gather over |k⃗|, so it does not reduce to
+    # a broadcast, and pkG is a host-array spline anyway. Build it by scalar
+    # assignment (see `similar_local()`), then apply it in one broadcast -- which
+    # is what lets the callable pk path, the primary interface, run on a GPU.
+    amp = similar_local(deltak, real(eltype(deltak)))
 
-    @time iterate_kspace(deltak; usethreads=false) do ijk_local,ijk_global
+    @time iterate_kspace(amp; usethreads=false) do ijk_local,ijk_global
         kx, ky, kz = kF .* ijk_global
 
         kmode = √(kx^2 + ky^2 + kz^2)
 
         pkG_mode = pkG(kmode)  # not thread-safe
 
-        deltak[ijk_local...] *= √(pkG_mode * Volume)
+        amp[ijk_local...] = √(pkG_mode * Volume)
     end
+
+    ampd = like_array(deltak, amp)
+    @strided @. deltak *= ampd
 
     return deltak
 end
@@ -222,7 +231,12 @@ end
 function scale_by_pk!(deltak, pk::AbstractArray{T,2}, bias, kF, Volume; rfftplan) where {T<:Number}
     lmax = size(pk, 2) - 1
 
-    pk3d = similar(deltak)
+    # Unlike the other k-space operations this one is a gather: it looks pk up at
+    # a radial bin computed per mode, so it is neither elementwise nor separable
+    # and does not reduce to a broadcast. It also runs once per simulation. So
+    # build it where `pk` already lives and scalar assignment is allowed (see
+    # `similar_local()`), and move the result across in one go.
+    pk3d = similar_local(deltak)
 
     @time iterate_kspace(pk3d; usethreads=true) do ijk_local, ijk_global
         n = norm(ijk_global)
@@ -238,10 +252,13 @@ function scale_by_pk!(deltak, pk::AbstractArray{T,2}, bias, kF, Volume; rfftplan
         pk3d[ijk_local...] = p
     end
 
+    # n == 0 above gives mu = 0/0 = NaN, so the DC mode must be set here.
+    # FIXME: on a distributed run this is the *local* (1,1,1), which is k⃗ = 0
+    # only on the rank owning the first block. Pre-existing.
     pk3d[1,1,1] = pk[1,1]
 
     # Note: bias will be applied here:
-    scale_by_pk!(deltak, pk3d, bias, kF, Volume; rfftplan)
+    scale_by_pk!(deltak, like_array(deltak, pk3d), bias, kF, Volume; rfftplan)
 end
 
 
