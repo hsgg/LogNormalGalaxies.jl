@@ -25,6 +25,32 @@ Base.deepcopy(pa::PencilArray) = PencilArray(pencil(pa), deepcopy(parent(pa)))
 Strided.StridedView(a::PencilArray) = Strided.StridedView(parent(a))  # FIXME: incomplete if there are permutations. To fix, need to figure out how to get the permutated view. However, this should only matter for things like matrix multiplication, where it is NOT just element-wise.
 
 
+############### using @strided with GPU arrays ####
+#
+# Strided.jl works on GPU arrays from v2.5 on: StridedGPUArraysExt is keyed on
+# GPUArrays (which every GPU backend depends on) so it loads by itself, and from
+# v2.5 an allocating `@strided` broadcast allocates its result with
+# `similar(parent, ...)`, keeping it on the device. Earlier 2.x allocated a host
+# Array instead, which would silently mix a host destination with device
+# sources, hence the compat lower bound.
+#
+# One rule has to be respected at the call sites: `@strided` does not evaluate
+# its expression, it captures it into a `Strided.CaptureArgs` tree that is
+# passed to the kernel as an argument. Anything that is not a bitstype
+# therefore cannot appear inside the expression. In particular a type
+# conversion written inline,
+#
+#     @strided @. deltak /= T(√NNN)          # T is a DataType => not isbits
+#
+# fails to compile with "passing non-bitstype argument". Compute such scalars
+# into a local first and reference the local:
+#
+#     norm_factor = T(√NNN)
+#     @strided @. deltak /= norm_factor
+#
+# Plain functions are fine, since they are singletons: `√(pkG * vol)` compiles.
+
+
 ############### functions to extend base Arrays ####
 
 # this is *un*like 'size_local()', because a pencil also has info about the
@@ -59,19 +85,35 @@ PencilFFTs.allocate_input(plan::FFTW.FFTWPlan{T}) where {T} = Array{T}(undef, si
 # can be handed to 'draw_phases(rfftplan; deltar)' directly.
 
 
-############### element types ####
+############### element types and array types ####
 
-# like_array(): Return `x` at `arr`'s precision, keeping `x`'s own realness, so
-# that a real window or power spectrum stays real against a complex field. A
-# user-supplied array is typically Float64 and must be narrowed to the precision
-# the pipeline runs at. `convert` is the identity when the type already matches,
-# so the Float64 path is untouched.
+# like_array(): Return `x` where `arr` lives -- same device, same array type --
+# and at `arr`'s precision, keeping `x`'s own realness, so that a real window or
+# power spectrum stays real against a complex field. Precision and device have
+# to travel together: a Float64 value is as fatal to a Float32 GPU run as a host
+# pointer is, and a user-supplied array can be wrong in both ways at once.
+#
+# Neither obvious one-liner does the job. `convert(AbstractArray{T}, x)` changes
+# only the element type (it is the identity when that already matches, which is
+# why it is the first step here), and `typeof(arr)(x)` is worse: `typeof` is
+# fully parameterised, e.g. MtlArray{ComplexF32,3,Metal.PrivateStorage}, so it
+# would force the real factors to complex. Hence convert, then similar() +
+# copyto!, the usual GPUArrays idiom.
 
 # the precision from `arr`, the realness from `x`
 match_precision_type(arr, x) = (R = real(eltype(arr)); eltype(x) <: Complex ? complex(R) : R)
 
-like_array(arr, x::AbstractArray) =
+# host destination: only the element type can differ
+like_array(arr::Array, x::AbstractArray) =
     convert(AbstractArray{match_precision_type(arr, x)}, x)
+
+# device destination: narrow on the host, then move across in one go
+function like_array(arr, x::AbstractArray)
+    y = convert(AbstractArray{match_precision_type(arr, x)}, x)
+    z = similar(arr, eltype(y), size(y))
+    copyto!(z, y)
+    return z
+end
 
 
 ############### functions to extend PencilFFTs ####

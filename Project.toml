@@ -34,9 +34,11 @@ QuadOsc = "0.1"
 Random = "1"
 StaticArrays = "1"
 Statistics = "1"
-Strided = "1, 2"
+Strided = "2.5"
 TwoFAST = "0.1"
-julia = "^1.7"
+# Strided 2.5, needed for GPU-safe @strided, requires 1.10 -- and 1.10 is what
+# CI's `lts` entry uses anyway.
+julia = "1.10"
 
 [extras]
 BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
