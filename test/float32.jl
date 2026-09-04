@@ -137,6 +137,37 @@ end
     end
 
 
+    # The `deltar` seam lets two backends run on *identical* white noise, which
+    # is the only way to compare fields deterministically across precisions.
+    # This is the reference shape for the eventual CPU/GPU comparison.
+    @testset "identical noise gives matching fields across precisions" begin
+        noise64 = randn(StableRNG(2024), n, n, n)
+
+        function field_from_noise(::Type{T}) where {T}
+            plan = LNG.plan_with_fftw(nxyz, T)
+            deltar = T.(noise64)
+            deltak = LNG.draw_phases(plan; deltar)
+            LNG.scale_by_pk!(deltak, pkfn, 1.5, kF, Volume; rfftplan=plan)
+            deltarg = plan \ deltak
+            @. deltarg = exp(deltarg * (n^3 / T(Volume)))
+            return deltarg
+        end
+
+        # the seam must not consume the rng at all: same noise, same answer
+        @test field_from_noise(Float64) == field_from_noise(Float64)
+
+        a = field_from_noise(Float64)
+        b = field_from_noise(Float32)
+        @test eltype(a) === Float64
+        @test eltype(b) === Float32
+        @test all(isfinite, a)
+        @test all(isfinite, b)
+        err = reldiff(a, b)
+        @info "Float32 vs Float64: density field from identical noise" err
+        @test b ≈ a rtol=1e-4
+    end
+
+
     # The precision commit narrowed scalars in these option paths, which the
     # reproducibility gate never reaches (it uses the defaults throughout).
     @testset "option paths stay in T: $label" for (label, opts) in [
