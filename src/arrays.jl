@@ -107,12 +107,34 @@ match_precision_type(arr, x) = (R = real(eltype(arr)); eltype(x) <: Complex ? co
 like_array(arr::Array, x::AbstractArray) =
     convert(AbstractArray{match_precision_type(arr, x)}, x)
 
+# and its parent is where broadcasting and `@strided` actually put the factors
+like_array(arr::PencilArray, x::AbstractArray) = like_array(parent(arr), x)
+
 # device destination: narrow on the host, then move across in one go
 function like_array(arr, x::AbstractArray)
     y = convert(AbstractArray{match_precision_type(arr, x)}, x)
     z = similar(arr, eltype(y), size(y))
     copyto!(z, y)
     return z
+end
+
+
+# memory_dim(): where logical dimension `d` of `arr` lives in memory order.
+# PencilArrays broadcast in memory order (PencilArrays/src/broadcast.jl), as
+# does `@strided`, which unwraps them to their parent. A permutation `p` puts
+# logical dimension `p[i]` in slot `i`, so `d` sits at `inv(p)[d]`.
+memory_dim(arr, d) = d
+memory_dim(arr::PencilArray, d) = inv(permutation(arr))[d]
+
+
+# broadcast_dim(): `v`, covering the local extent of dimension `d`, placed
+# where `arr` lives and reshaped to broadcast along that dimension. A separable
+# k-space operation is then one fused broadcast against three of these: no N^3
+# temporary, no scalar indexing, and one code path for every backend.
+function broadcast_dim(arr, v::AbstractVector, d)
+    dmem = memory_dim(arr, d)
+    shape = ntuple(i -> i == dmem ? length(v) : 1, ndims(arr))
+    return reshape(like_array(arr, v), shape)
 end
 
 

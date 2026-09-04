@@ -284,18 +284,52 @@ end
 
 ################## calc velocities ###########################
 
-function calc_velocity_component!(deltak, kF::Tuple, coord)
-    iterate_kspace(deltak; usethreads=true) do ijk_local,ijk_global
-        kvec = kF .* ijk_global
-        kx, ky, kz = kvec
-        kmode2 = kx^2 + ky^2 + kz^2
-        if kmode2 == 0
-            deltak[ijk_local...] = 0
-        else
-            deltak[ijk_local...] *= im * kvec[coord] / kmode2
-        end
+@doc raw"""
+    kgrid_1d(deltak, kF, d)
+
+The wavenumbers along dimension `d` of the k-space array `deltak`, in FFT order
+and in `deltak`'s real element type.
+
+Narrowing to that element type here, on the host, is deliberate: the products
+below then never involve `Float64`, which a GPU may not support at all. Note
+that `sqrt(::Int)` is `Float64`, so leaving the integer wavenumbers to be
+squared on the device would reintroduce it.
+"""
+function kgrid_1d(deltak, kF, d)
+    nxyz = size_global(deltak)
+    localrange = range_local(deltak)
+    # matches iterate_kspace(; first_half_dimension=true): dimension 1 holds the
+    # non-negative half of the rfft, the others wrap to negative frequencies
+    nd2 = d == 1 ? nxyz[1] : (nxyz[d] ÷ 2 + 1)
+
+    k = Vector{real(eltype(deltak))}(undef, size(deltak, d))
+    for i in eachindex(k)
+        ig = localrange[d][i] - 1
+        ig = ig < nd2 ? ig : ig - nxyz[d]
+        k[i] = kF[d] * ig
     end
-    return deltak
+    return k
+end
+
+
+# δ(k⃗) ↦ i k_coord / |k⃗|² δ(k⃗), and 0 at k⃗ = 0. The grouping matches the
+# original scalar loop so that Float64 results stay bit-identical.
+@inline function _velocity_component(d, kx, ky, kz, kc)
+    kmode2 = kx^2 + ky^2 + kz^2
+    return iszero(kmode2) ? zero(d) : d * (im * kc / kmode2)
+end
+
+
+function calc_velocity_component!(deltak, kF::Tuple, coord)
+    # |k⃗|² is separable, so three small vectors and one fused broadcast do this
+    # with no N^3 temporary and no scalar indexing. `broadcast_dim()` handles
+    # placement for every backend, PencilArrays included.
+    kx = broadcast_dim(deltak, kgrid_1d(deltak, kF, 1), 1)
+    ky = broadcast_dim(deltak, kgrid_1d(deltak, kF, 2), 2)
+    kz = broadcast_dim(deltak, kgrid_1d(deltak, kF, 3), 3)
+    kc = (kx, ky, kz)[coord]
+    @strided @. deltak = _velocity_component(deltak, kx, ky, kz, kc)
+    return deltak  # not the StridedView that @strided would otherwise return
 end
 
 calc_velocity_component!(deltak, kF, coord) = calc_velocity_component!(deltak, (kF...,), coord)
@@ -615,18 +649,14 @@ function pixel_window!(deltak, nxyz; voxel_window_correction=1)
         return w
     end
 
-    wx = sinc_window_1d(1)
-    wy = sinc_window_1d(2)
-    wz = sinc_window_1d(3)
+    # Separable, so one fused broadcast against three small vectors, with no
+    # N^3 temporary and no scalar indexing. See `calc_velocity_component!()`.
+    wx = broadcast_dim(deltak, sinc_window_1d(1), 1)
+    wy = broadcast_dim(deltak, sinc_window_1d(2), 2)
+    wz = broadcast_dim(deltak, sinc_window_1d(3), 3)
+    @strided @. deltak *= wx * wy * wz
 
-    # Note: We use `r-space` here, because we already did the fft-ordering in
-    # `sinc_window_1d()` above.
-    iterate_rspace(deltak; usethreads=true) do ijk_local, ijk_global
-        i, j, k = ijk_global .+ 1
-        deltak[ijk_local...] *= wx[i] * wy[j] * wz[k]
-    end
-
-    return deltak
+    return deltak  # not the StridedView that @strided would otherwise return
 end
 
 
