@@ -357,6 +357,7 @@ selected(name) = isempty(ARGS) || name in ARGS
 
     selected("apply_rsd") && include("apply_rsd.jl")
     selected("iterate_kspace") && include("iterate_kspace.jl")
+    selected("pencil_arraytype") && include("pencil_arraytype.jl")
 
 
     ## This meant to be used more interactively:

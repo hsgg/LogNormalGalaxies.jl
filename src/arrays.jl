@@ -63,13 +63,7 @@ PencilFFTs.size_global(arr::AbstractArray) = size(arr)
 
 PencilFFTs.sizeof_global(arr::AbstractArray) = sizeof(arr)
 
-PencilFFTs.range_local(arr::AbstractArray) = begin
-    r = ()
-    for s in size_global(arr)
-        r = (r..., 1:s)
-    end
-    return r
-end
+PencilFFTs.range_local(arr::AbstractArray) = Tuple(1:s for s in size_global(arr))
 
 
 ############### functions to extend FFTW ####
@@ -107,12 +101,16 @@ match_precision_type(arr, x) = (R = real(eltype(arr)); eltype(x) <: Complex ? co
 like_array(arr::Array, x::AbstractArray) =
     convert(AbstractArray{match_precision_type(arr, x)}, x)
 
-# a PencilArray keeps its pencil -- rebuilding one from size() would be wrong,
-# since that is only the process-local block
+# a PencilArray keeps its decomposition -- rebuilding one from size() would be
+# wrong, since that is only the process-local block -- but not its storage: the
+# parent goes through the methods above, so a host gather from `similar_local()`
+# lands back on `arr`'s device. The wrapper is built on `pencil(arr)`, not
+# `pencil(x)`, because a Pencil carries its array type and rejects a parent that
+# does not match; both are the same decomposition at every call site.
 function like_array(arr::PencilArray, x::PencilArray)
-    T = match_precision_type(arr, x)
-    eltype(x) === T && return x
-    return PencilArray(pencil(x), convert(AbstractArray{T}, parent(x)))
+    p = like_array(parent(arr), parent(x))
+    p === parent(x) && return x  # nothing to convert and nowhere to move
+    return PencilArray(pencil(arr), p)
 end
 
 # and its parent is where broadcasting and `@strided` actually put the factors
@@ -127,13 +125,18 @@ function like_array(arr, x::AbstractArray)
 end
 
 
-# similar_local(): an uninitialized array with `arr`'s local block shape and
-# index semantics, but on the host unless `arr` is distributed. For the k-space
-# gathers, which must be built by scalar assignment: a PencilArray has to stay
-# one (`iterate_kspace()` reads its `range_local()` for global indices), while a
-# device array becomes a plain Array that `like_array()` moves back.
+# similar_local(): uninitialized, with `arr`'s local shape and index semantics
+# but always on the host, for the k-space gathers built by scalar assignment. A
+# device array becomes a plain Array that `like_array()` moves back; a PencilArray
+# has to stay one, since `iterate_kspace()` reads its `range_local()` for global
+# indices. A distributed GPU array needs both at once, hence host storage inside a
+# PencilArray wrapper: `similar(::Pencil, Array)` restates the decomposition over
+# host storage (and returns the same pencil when it already is), because a Pencil
+# carries its array type and rejects a mismatched parent. `size(parent(arr))` is
+# the local block in *memory* order, which is what the constructor checks.
 similar_local(arr, ::Type{T}) where {T} = Array{T}(undef, size(arr)...)
-similar_local(arr::PencilArray, ::Type{T}) where {T} = similar(arr, T)
+similar_local(arr::PencilArray, ::Type{T}) where {T} =
+    PencilArray(similar(pencil(arr), Array), Array{T}(undef, size(parent(arr))))
 similar_local(arr) = similar_local(arr, eltype(arr))
 
 
@@ -156,17 +159,23 @@ function broadcast_dim(arr, v::AbstractVector, d)
 end
 
 
-# to_host(): The dual of `like_array()`, for the steps that have to run on the
-# CPU. Dispatch is by exclusion, so that no GPU package needs to be named here:
-# ordinary arrays, numbers (the velocity components are literal 0 when there are
-# no redshift-space distortions) and PencilArrays pass through untouched, and
-# anything else is assumed to live on a device and is brought over.
+# to_host(): bring `x` to the CPU for the steps that have to run there. Not the
+# inverse of `like_array()`, despite the resemblance: that one matches a
+# prototype array -- precision included -- and on a host pipeline moves nothing
+# at all, whereas this is the unconditional one-way trip, with no prototype and
+# nothing to say about the element type. Dispatch is by exclusion, so that no
+# GPU package needs to be named here:
+# ordinary arrays and numbers (the velocity components are literal 0 when there
+# are no redshift-space distortions) pass through untouched, and anything else is
+# assumed to live on a device and is brought over.
 #
-# PencilArrays must not be converted: the callers derive *global* indices from
-# `range_local()`, which a plain Array would answer wrongly on every rank but 0.
+# PencilArrays are not unwrapped: the callers derive *global* indices from
+# `range_local()`, which a plain Array would answer wrongly on every rank but 0. A
+# device-backed one is restated over host storage instead, as in `similar_local()`.
 to_host(x::Number) = x
 to_host(x::Array) = x
-to_host(x::PencilArray) = x
+to_host(x::PencilArray) = parent(x) isa Array ? x :
+    PencilArray(similar(pencil(x), Array), Array(parent(x)))
 to_host(x::AbstractArray) = Array(x)
 
 
