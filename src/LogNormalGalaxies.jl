@@ -688,10 +688,16 @@ end
 
 ################## simulate_galaxies() ##################
 # Here are multiple functions called 'simulate_galaxies()'. They only differ in
-# their interface.
+# their interface. This one is the core: the real-space white noise `deltar`
+# fixes the mesh size, the element type and the array type -- hence the backend
+# -- of everything downstream. The two below are wrappers for the older
+# mesh-size-and-planner interfaces.
 
 # simulate galaxies
-function simulate_galaxies(nxyz, Lxyz, nbar, pk, b, faH; rfftplan=default_plan(nxyz), rng=Random.GLOBAL_RNG, deltar=nothing, voxel_window_power=1, velocity_assignment=1, win=1, sigma_psi=0.0, phase_shift=0.0, fixed_amplitude=false, fixed_phase=false, gather=true, minimize_shotnoise=false, voxel_window_correction=0)
+function simulate_galaxies(deltar::AbstractArray{<:Real,3}, Lxyz, nbar, pk, b, faH; rfftplan=plan_rfft(deltar), rng=Random.GLOBAL_RNG, voxel_window_power=1, velocity_assignment=1, win=1, sigma_psi=0.0, phase_shift=0.0, fixed_amplitude=false, fixed_phase=false, gather=true, minimize_shotnoise=false, voxel_window_correction=0)
+    # The default `rfftplan` is only reachable for a non-distributed array: a
+    # PencilArray has to be allocated from its plan, so that path passes one in.
+    nxyz = size_global(deltar)
     nx, ny, nz = nxyz
     Lx, Ly, Lz = Lxyz
     Volume = Lx * Ly * Lz
@@ -865,6 +871,22 @@ function simulate_galaxies(nxyz, Lxyz, nbar, pk, b, faH; rfftplan=default_plan(n
 end
 
 
+# Mesh-size interface: allocate the noise from the plan, then call the core.
+# `rng` is consumed here, in the same order `draw_phases()` used to consume it.
+function simulate_galaxies(nxyz, Lxyz, nbar, pk, b, faH;
+        rfftplan=default_plan(nxyz), rng=Random.GLOBAL_RNG, deltar=nothing, kwargs...)
+    if isnothing(deltar)
+        deltar = allocate_input(rfftplan)
+        randn!(rng, parent(deltar))
+    elseif Tuple(size_global(deltar)) != Tuple(nxyz)
+        throw(DimensionMismatch(
+            "deltar has global size $(Tuple(size_global(deltar))), but nmesh asks for $(Tuple(nxyz))"))
+    end
+
+    return simulate_galaxies(deltar, Lxyz, nbar, pk, b, faH; rfftplan, rng, kwargs...)
+end
+
+
 @doc raw"""
     simulate_galaxies(nbar, Lbox, pk; nmesh=256, bias=1.0, f=false,
         rfftplanner=default_plan, T=Float64, rng=Random.GLOBAL_RNG,
@@ -878,9 +900,25 @@ Simulate galaxies using log-normal statistics.
 hence of the returned positions and velocities. It is forwarded to
 `rfftplanner`, which may also be given a ready-made plan instead. Note that
 `Float32` resolves a 1 Gpc box to only ~6e-5 Mpc.
+
+`deltar` supplies the white noise itself. It is used as given, never drawn
+into, so it must already be filled; and since every other array is derived from
+it, passing one selects the element type *and* the array type of the whole
+simulation. So to run on an Apple GPU, which has no `Float64` at all:
+
+```julia
+using Metal
+simulate_galaxies(nbar, Lbox, pk; nmesh, deltar=MtlArray(randn(Float32, nmesh, nmesh, nmesh)))
+```
+
+This bypasses `rng`, which then only affects the Poisson sampling; leave
+`deltar` out to have the noise drawn from `rng` as usual.
+
+Drawing the galaxies themselves is serial and always runs on the CPU; the
+fields are copied back for it.
 """
 function simulate_galaxies(nbar, Lbox, pk; nmesh=256, bias=1.0, f=false,
-        rfftplanner=default_plan, T=Float64, kwargs...)
+        rfftplanner=default_plan, T=Float64, deltar=nothing, kwargs...)
 
     if nmesh isa Number
         nxyz = nmesh, nmesh, nmesh
@@ -894,10 +932,18 @@ function simulate_galaxies(nbar, Lbox, pk; nmesh=256, bias=1.0, f=false,
         Lxyz = Lbox
     end
 
-    @time rfftplan = make_rfftplan(rfftplanner, nxyz, T)
+    # A named planner wins, and is the only way to get a distributed run, since
+    # PencilFFTs builds the plan before it can allocate a matching input.
+    # Otherwise `deltar` supplies both element type and backend, which is what
+    # makes running elsewhere a single keyword.
+    @time rfftplan = if isnothing(deltar) || rfftplanner !== default_plan
+        make_rfftplan(rfftplanner, nxyz, T)
+    else
+        plan_rfft(deltar)
+    end
 
     @time xyzv = simulate_galaxies(nxyz, Lxyz, nbar, pk, bias, f;
-                                   rfftplan, kwargs...)
+                                   rfftplan, deltar, kwargs...)
     println("Post-processing...")
     # narrowed so that this allocating broadcast cannot promote xyz back to Float64
     box_shift = real(eltype(xyzv)).(Lbox ./ 2)
