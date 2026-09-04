@@ -26,6 +26,7 @@ selected(name) = isempty(ARGS) || name in ARGS
 @testset verbose=true "LogNormalGalaxies" begin
 
     selected("reproducibility") && include("reproducibility.jl")
+    selected("float32") && include("float32.jl")
 
     selected("compile") && @testset "Compile and load $rfftplanner" for rfftplanner=[LogNormalGalaxies.plan_with_fftw,LogNormalGalaxies.plan_with_pencilffts]
         @show rfftplanner
@@ -51,8 +52,11 @@ selected(name) = isempty(ARGS) || name in ARGS
         # generate catalog
         @time x⃗, Ψ = simulate_galaxies(nbar, L+ΔL, pk; nmesh=n, bias, f=1, rfftplanner)
         @show size(x⃗), size(Ψ)
+        # Float64 is still the default; see float32.jl for the general case.
         @test typeof(x⃗) <: Array{Float64}
         @test typeof(Ψ) <: Array{Float64}
+        @test typeof(x⃗) <: Array{<:AbstractFloat}
+        @test typeof(Ψ) <: Array{<:AbstractFloat}
     end
 
 
