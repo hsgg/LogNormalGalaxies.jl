@@ -82,6 +82,66 @@ selected(name) = isempty(ARGS) || name in ARGS
     end
 
 
+    # The k-space operations are one broadcast for every backend now, and a
+    # PencilArray broadcasts in *memory* order, so `broadcast_dim()` has to place
+    # each factor at its permuted axis. Nothing else checks that: run identical
+    # noise through both backends and demand the same field. Single-rank -- all
+    # `Pkg.test` gives us -- but a single rank already carries a
+    # Permutation(3,2,1), which is the part that needs checking. Multi-rank
+    # local ranges remain untested. (Hence also no ARM64 skip here.)
+    selected("pencil_kspace") && @testset "PencilFFTs matches FFTW in k-space" begin
+        begin
+            n = 16
+            nxyz = (n, n, n)
+            L = 100.0
+            kF = (2π / L) .* (1, 1, 1)
+            Volume = L^3
+
+            keq = 2e-2
+            pkfn(k) = 2e4 * 4 * keq^3 * k / (3 * keq^4 + k^4)
+            pk1d = pkfn.((2π / L) .* (0:(n - 1)))
+
+            noise = randn(StableRNG(4711), nxyz...)
+
+            # A host array in logical index order, for both array types.
+            # `CartesianIndices(::PencilArray)` yields logical indices but
+            # *iterates* in memory order, so a comprehension over it would come
+            # out permuted; hence the explicit loops. Single-rank only.
+            to_plain(u) = [u[i,j,k] for i in axes(u,1), j in axes(u,2), k in axes(u,3)]
+
+            function kspace_field(rfftplanner, op!)
+                rfftplan = rfftplanner(nxyz)
+                deltar = LogNormalGalaxies.allocate_input(rfftplan)
+                for I in CartesianIndices(deltar)
+                    deltar[I] = noise[I]
+                end
+                deltak = LogNormalGalaxies.draw_phases(rfftplan; deltar)
+                return to_plain(op!(deltak, rfftplan))
+            end
+
+            @testset "$name" for (name, op!) in [
+                    "draw_phases" =>
+                        (dk, p) -> dk,
+                    "pixel_window!" =>
+                        (dk, p) -> LogNormalGalaxies.pixel_window!(dk, nxyz; voxel_window_correction=1),
+                    "calc_velocity_component!" =>
+                        (dk, p) -> LogNormalGalaxies.calc_velocity_component!(dk, kF, 2),
+                    "scale_by_pk!(callable)" =>
+                        (dk, p) -> LogNormalGalaxies.scale_by_pk!(dk, pkfn, 1.5, kF, Volume; rfftplan=p),
+                    "scale_by_pk!(array)" =>
+                        (dk, p) -> LogNormalGalaxies.scale_by_pk!(dk, pk1d, 1.5, kF, Volume; rfftplan=p),
+                ]
+                a = kspace_field(LogNormalGalaxies.plan_with_fftw, op!)
+                b = kspace_field(LogNormalGalaxies.plan_with_pencilffts, op!)
+                @test size(a) == size(b)
+                @test all(isfinite, a)
+                # both call FFTW on the same noise: reassociation apart only
+                @test a ≈ b rtol=1e-10
+            end
+        end
+    end
+
+
     selected("pk_to_pkG") && @testset "pk_to_pkG(D²=$D²)" for D²=[0.1,1.0]
         @show D²
         data = readdlm((@__DIR__)*"/matterpower.dat", comments=true)
