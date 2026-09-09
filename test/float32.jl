@@ -19,19 +19,12 @@
 
 using Test
 using LogNormalGalaxies
-using LinearAlgebra: norm
+import LogNormalGalaxies as LNG
 using Random
 using StableRNGs
 
-const LNG = LogNormalGalaxies
+isdefined(@__MODULE__, :reldiff) || include("testutils.jl")
 
-
-# The assertions below are plain `≈`, which is itself norm-based. This exists
-# only to *report* the error, which `≈` cannot do. No conversion is needed
-# anywhere: mixed precisions promote on their own, and `norm` reduces pairwise,
-# so even a pure Float32 norm of these arrays is good to ~3e-7 relative -- far
-# below the tolerances below.
-reldiff(a, b) = norm(a .- b) / norm(a)
 
 
 function f32_testpk()
