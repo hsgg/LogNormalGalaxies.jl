@@ -38,10 +38,6 @@ selected(name) = isempty(ARGS) || name in ARGS
 
     selected("compile") && @testset "Compile and load $rfftplanner" for rfftplanner=[LogNormalGalaxies.plan_with_fftw,LogNormalGalaxies.plan_with_pencilffts]
         @show rfftplanner
-        if Sys.ARCH == :aarch64 && rfftplanner == LogNormalGalaxies.plan_with_pencilffts
-            @test_skip "Skipping PencilFFTs on ARM64"
-            continue
-        end
 
         bias = 1.8
         f = 0.71
