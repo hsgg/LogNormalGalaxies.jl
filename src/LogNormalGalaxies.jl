@@ -60,22 +60,27 @@ using .LinearInterpolations
 
 ######################## misc functions
 
-estimate_memory(N::Integer) = estimate_memory([N,N,N])
+estimate_memory(N::Integer, ::Type{T}=Float64) where {T} = estimate_memory([N,N,N], T)
 
-function estimate_memory(nxyz::Array)
+function estimate_memory(nxyz::Array, ::Type{T}=Float64) where {T}
     nfloats = 9 * prod(nxyz)
-    memory = nfloats * sizeof(Float64)
+    memory = nfloats * sizeof(T)
     return memory
 end
 
 
 # choose fft plan
+#
+# The plan determines both the element type and the array type of the whole
+# pipeline: everything downstream is derived from `allocate_input(rfftplan)` by
+# transforming, `similar()`, or `copy()`. Apple GPUs have no Float64 at all, so
+# supporting Float32 here is what makes a GPU backend possible.
 
-function plan_with_fftw(nxyz; kwargs...)
-    return plan_rfft(Array{Float64}(undef, nxyz...); kwargs...)
+function plan_with_fftw(nxyz, ::Type{T}=Float64; kwargs...) where {T<:AbstractFloat}
+    return plan_rfft(Array{T}(undef, nxyz...); kwargs...)
 end
 
-function plan_with_pencilffts(nxyz; kwargs...)
+function plan_with_pencilffts(nxyz, ::Type{T}=Float64; kwargs...) where {T<:AbstractFloat}
     rank, comm = start_mpi()
 
     proc_dims = MPI.Dims_create(MPI.Comm_size(comm), zeros(Int, 2))
@@ -83,7 +88,7 @@ function plan_with_pencilffts(nxyz; kwargs...)
     transform = Transforms.RFFT()
     @show proc_dims typeof(proc_dims)
 
-    @time rfftplan = PencilFFTPlan((nxyz...,), transform, proc_dims, comm; kwargs...)
+    @time rfftplan = PencilFFTPlan((nxyz...,), transform, proc_dims, comm, T; kwargs...)
     return rfftplan
 end
 
@@ -91,19 +96,54 @@ const default_plan = plan_with_fftw
 #const default_plan = plan_with_pencilffts
 
 
+# The planner may be a ready-made plan, a planner accepting (nxyz, T), or a
+# legacy planner accepting only (nxyz) and fixing its own element type.
+function make_rfftplan(rfftplanner, nxyz, ::Type{T}) where {T}
+    rfftplanner isa Function || return rfftplanner
+    applicable(rfftplanner, nxyz, T) && return rfftplanner(nxyz, T)
+    T === Float64 || throw(ArgumentError(
+        "the given rfftplanner does not accept an element type, so T=$T cannot " *
+        "be requested; pass e.g. `rfftplanner = nxyz -> plan_with_fftw(nxyz, $T)`"))
+    return rfftplanner(nxyz)
+end
+
+
 
 #################### draw deltak ###########################
 
-function draw_phases(rfftplan; rng=Random.GLOBAL_RNG)
-    deltar = allocate_input(rfftplan)
+@doc raw"""
+    draw_phases(rfftplan; rng=Random.GLOBAL_RNG, deltar=nothing)
+
+Draw a unit-variance Gaussian random field, and return it in Fourier space.
+
+By default the real-space white noise is allocated with
+`allocate_input(rfftplan)` and filled from `rng`. Passing `deltar` supplies the
+noise directly instead. This is the single point where the array type of the
+whole pipeline is decided -- everything downstream is derived from it by
+transforming, `similar()`, or `copy()` -- so passing e.g. an `MtlArray` is what
+makes the rest of the pipeline run on a GPU.
+
+The contents of `deltar` are used as given and never drawn into, which is how
+two backends can be run on *identical* white noise and compared -- and which
+means a `deltar` allocated with `undef` is uninitialized memory, not noise.
+"""
+function draw_phases(rfftplan; rng=Random.GLOBAL_RNG, deltar=nothing)
+    if isnothing(deltar)
+        deltar = allocate_input(rfftplan)
+        randn!(rng, parent(deltar))
+    end
     #@show size(deltar),length(deltar)
-    randn!(rng, parent(deltar))
     #@show mean(deltar),var_global(deltar)
     #@assert !isnan(mean(deltar))
 
     deltak_phases = rfftplan * deltar
     NNN = prod(size(deltar))
-    @strided @. deltak_phases /= √NNN
+    T = real(eltype(deltak_phases))
+    # Hoisted: `@strided` captures its expression lazily into a kernel argument,
+    # so a type conversion written inline would carry a DataType onto the
+    # device, which is not a bitstype and fails to compile. See src/arrays.jl.
+    norm_factor = T(√NNN)
+    @strided @. deltak_phases /= norm_factor
     #@show mean(deltak_phases)
     #@assert !isnan(mean(deltak_phases))
 
@@ -116,16 +156,25 @@ end
 function multiply_by_pkG!(deltak, pkG, kF, Volume)
     # This function only exists so that pkG is type-stable within
     # `iterate_kspace()`.
+    #
+    # The amplitude √(P_G(|k⃗|)·V) is a gather over |k⃗|, so it does not reduce to
+    # a broadcast, and pkG is a host-array spline anyway. Build it by scalar
+    # assignment (see `similar_local()`), then apply it in one broadcast -- which
+    # is what lets the callable pk path, the primary interface, run on a GPU.
+    amp = similar_local(deltak, real(eltype(deltak)))
 
-    @time iterate_kspace(deltak; usethreads=false) do ijk_local,ijk_global
+    @time iterate_kspace(amp; usethreads=false) do ijk_local,ijk_global
         kx, ky, kz = kF .* ijk_global
 
         kmode = √(kx^2 + ky^2 + kz^2)
 
         pkG_mode = pkG(kmode)  # not thread-safe
 
-        deltak[ijk_local...] *= √(pkG_mode * Volume)
+        amp[ijk_local...] = √(pkG_mode * Volume)
     end
+
+    ampd = like_array(deltak, amp)
+    @strided @. deltak *= ampd
 
     return deltak
 end
@@ -139,21 +188,39 @@ function scale_by_pk!(deltak, pk, bias, kF, Volume; rfftplan)
 end
 
 
-function scale_by_pk!(deltak, pk::AbstractArray{T,3}, bias, kF, Volume; rfftplan) where {T<:Number}
+function scale_by_pk!(deltak, pk::AbstractArray{Tpk,3}, bias, kF, Volume; rfftplan) where {Tpk<:Number}
     println("  Calculating normal pkG via 3D Fourier transform...")
     @assert length(kF) == 3
+
+    # Every scalar that multiplies an array must be narrowed to the pipeline's
+    # element type. A Float64 scalar would otherwise promote the whole array
+    # back to Float64, which silently defeats T=Float32 and is fatal on a GPU
+    # that has no Float64 at all.
+    T = real(eltype(deltak))
     N3 = prod(size(rfftplan))
     d3k = prod(kF)
-    d3x = Volume / N3
+    d3x = T(Volume / N3)
+    fac = T(N3 * d3k / (2π)^3)
+    biassq = T(bias)^2
+    vol = T(Volume)
 
-    @time @strided xi = rfftplan \ pk .* (N3 * d3k / (2π)^3)
+    # Note: the transforms are kept out of the `@strided` expressions. `@strided`
+    # would wrap their argument in a StridedView, which an FFT plan does not
+    # recognise -- on a GPU it then falls back to a generic implementation that
+    # indexes element by element and raises "scalar indexing is disallowed".
+    pk_matched = like_array(deltak, pk)
+    @time xi = rfftplan \ pk_matched
+    @strided @. xi *= fac
 
     # transform to Gaussian field correlation
-    @time @strided @. xi = log1p(bias^2 * xi)
+    @time @strided @. xi = log1p(biassq * xi)
 
-    @time @strided pkG = rfftplan * xi .* d3x
+    @time pkG = rfftplan * xi
+    @strided @. pkG *= d3x
 
-    @time @strided @. deltak *= √(pkG * Volume)
+    @time @strided @. deltak *= √(pkG * vol)
+
+    return deltak  # not the StridedView that @strided would otherwise return
 end
 
 
@@ -172,12 +239,19 @@ end
 function scale_by_pk!(deltak, pk::AbstractArray{T,2}, bias, kF, Volume; rfftplan) where {T<:Number}
     lmax = size(pk, 2) - 1
 
-    pk3d = similar(deltak)
+    # Unlike the other k-space operations this one is a gather: it looks pk up at
+    # a radial bin computed per mode, so it is neither elementwise nor separable
+    # and does not reduce to a broadcast. It also runs once per simulation. So
+    # build it where `pk` already lives and scalar assignment is allowed (see
+    # `similar_local()`), and move the result across in one go.
+    pk3d = similar_local(deltak)
 
     @time iterate_kspace(pk3d; usethreads=true) do ijk_local, ijk_global
         n = norm(ijk_global)
 
-        mu = eltype(pk3d)(ijk_global[3] / n)
+        # `pk3d` is complex, so eltype(pk3d) would make mu (and every
+        # legendre(mu, ell) below) needlessly complex.
+        mu = real(eltype(pk3d))(ijk_global[3] / n)
 
         k = round(Int, n) + 1
 
@@ -186,10 +260,13 @@ function scale_by_pk!(deltak, pk::AbstractArray{T,2}, bias, kF, Volume; rfftplan
         pk3d[ijk_local...] = p
     end
 
+    # n == 0 above gives mu = 0/0 = NaN, so the DC mode must be set here.
+    # FIXME: on a distributed run this is the *local* (1,1,1), which is k⃗ = 0
+    # only on the rank owning the first block. Pre-existing.
     pk3d[1,1,1] = pk[1,1]
 
     # Note: bias will be applied here:
-    scale_by_pk!(deltak, pk3d, bias, kF, Volume; rfftplan)
+    scale_by_pk!(deltak, like_array(deltak, pk3d), bias, kF, Volume; rfftplan)
 end
 
 
@@ -225,25 +302,60 @@ end
 function set_fixed_phase!(deltak, phase)
     # exp(im*π) does not specialize for irrational
     exp_phase = cos(phase) + im * sin(phase)
-    exp_phase_normed = exp_phase / abs(exp_phase)
-    return @strided @. deltak = abs(deltak) * exp_phase_normed
+    exp_phase_normed = complex(eltype(deltak))(exp_phase / abs(exp_phase))
+    @strided @. deltak = abs(deltak) * exp_phase_normed
+    return deltak  # not the StridedView that @strided would otherwise return
 end
 
 
 ################## calc velocities ###########################
 
-function calc_velocity_component!(deltak, kF::Tuple, coord)
-    iterate_kspace(deltak; usethreads=true) do ijk_local,ijk_global
-        kvec = kF .* ijk_global
-        kx, ky, kz = kvec
-        kmode2 = kx^2 + ky^2 + kz^2
-        if kmode2 == 0
-            deltak[ijk_local...] = 0
-        else
-            deltak[ijk_local...] *= im * kvec[coord] / kmode2
-        end
+@doc raw"""
+    kgrid_1d(deltak, kF, d)
+
+The wavenumbers along dimension `d` of the k-space array `deltak`, in FFT order
+and in `deltak`'s real element type.
+
+Narrowing to that element type here, on the host, is deliberate: the products
+below then never involve `Float64`, which a GPU may not support at all. Note
+that `sqrt(::Int)` is `Float64`, so leaving the integer wavenumbers to be
+squared on the device would reintroduce it.
+"""
+function kgrid_1d(deltak, kF, d)
+    nxyz = size_global(deltak)
+    localrange = range_local(deltak)
+    # matches iterate_kspace(; first_half_dimension=true): dimension 1 holds the
+    # non-negative half of the rfft, the others wrap to negative frequencies
+    nd2 = d == 1 ? nxyz[1] : (nxyz[d] ÷ 2 + 1)
+
+    k = Vector{real(eltype(deltak))}(undef, size(deltak, d))
+    for i in eachindex(k)
+        ig = localrange[d][i] - 1
+        ig = ig < nd2 ? ig : ig - nxyz[d]
+        k[i] = kF[d] * ig
     end
-    return deltak
+    return k
+end
+
+
+# δ(k⃗) ↦ i k_coord / |k⃗|² δ(k⃗), and 0 at k⃗ = 0. The grouping matches the
+# original scalar loop so that Float64 results stay bit-identical.
+@inline function _velocity_component(d, kx, ky, kz, kc)
+    kmode2 = kx^2 + ky^2 + kz^2
+    return iszero(kmode2) ? zero(d) : d * (im * kc / kmode2)
+end
+
+
+function calc_velocity_component!(deltak, kF::Tuple, coord)
+    # |k⃗|² is separable, so three small vectors and one fused broadcast do this
+    # with no N^3 temporary and no scalar indexing. `broadcast_dim()` handles
+    # placement for every backend, PencilArrays included.
+    kx = broadcast_dim(deltak, kgrid_1d(deltak, kF, 1), 1)
+    ky = broadcast_dim(deltak, kgrid_1d(deltak, kF, 2), 2)
+    kz = broadcast_dim(deltak, kgrid_1d(deltak, kF, 3), 3)
+    kc = (kx, ky, kz)[coord]
+    @strided @. deltak = _velocity_component(deltak, kx, ky, kz, kc)
+    return deltak  # not the StridedView that @strided would otherwise return
 end
 
 calc_velocity_component!(deltak, kF, coord) = calc_velocity_component!(deltak, (kF...,), coord)
@@ -253,7 +365,10 @@ calc_velocity_component!(deltak, kF, coord) = calc_velocity_component!(deltak, (
 function draw_galaxies_with_velocities(deltar, vx, vy, vz, Navg, Ngalaxies, Δx,
         ::Val{do_rsd}, ::Val{voxel_window_power}, ::Val{velocity_assignment};
         rng=Random.GLOBAL_RNG, minimize_shotnoise=false) where {do_rsd,voxel_window_power,velocity_assignment}
-    T = Float64
+    # Only the output buffer follows the field's precision. The position
+    # arithmetic below deliberately stays in Float64: this loop runs on the
+    # host, and a 1 Gpc box in Float32 would only resolve ~6e-5 Mpc.
+    T = real(eltype(deltar))
 
     num_fields = 6  # 3 pos + 3 vel (+ 1 mass?)
 
@@ -560,27 +675,29 @@ function pixel_window!(deltak, nxyz; voxel_window_correction=1)
         return w
     end
 
-    wx = sinc_window_1d(1)
-    wy = sinc_window_1d(2)
-    wz = sinc_window_1d(3)
+    # Separable, so one fused broadcast against three small vectors, with no
+    # N^3 temporary and no scalar indexing. See `calc_velocity_component!()`.
+    wx = broadcast_dim(deltak, sinc_window_1d(1), 1)
+    wy = broadcast_dim(deltak, sinc_window_1d(2), 2)
+    wz = broadcast_dim(deltak, sinc_window_1d(3), 3)
+    @strided @. deltak *= wx * wy * wz
 
-    # Note: We use `r-space` here, because we already did the fft-ordering in
-    # `sinc_window_1d()` above.
-    iterate_rspace(deltak; usethreads=true) do ijk_local, ijk_global
-        i, j, k = ijk_global .+ 1
-        deltak[ijk_local...] *= wx[i] * wy[j] * wz[k]
-    end
-
-    return deltak
+    return deltak  # not the StridedView that @strided would otherwise return
 end
 
 
 ################## simulate_galaxies() ##################
 # Here are multiple functions called 'simulate_galaxies()'. They only differ in
-# their interface.
+# their interface. This one is the core: the real-space white noise `deltar`
+# fixes the mesh size, the element type and the array type -- hence the backend
+# -- of everything downstream. The two below are wrappers for the older
+# mesh-size-and-planner interfaces.
 
 # simulate galaxies
-function simulate_galaxies(nxyz, Lxyz, nbar, pk, b, faH; rfftplan=default_plan(nxyz), rng=Random.GLOBAL_RNG, voxel_window_power=1, velocity_assignment=1, win=1, sigma_psi=0.0, phase_shift=0.0, fixed_amplitude=false, fixed_phase=false, gather=true, minimize_shotnoise=false, voxel_window_correction=0)
+function simulate_galaxies(deltar::AbstractArray{<:Real,3}, Lxyz, nbar, pk, b, faH; rfftplan=plan_rfft(deltar), rng=Random.GLOBAL_RNG, voxel_window_power=1, velocity_assignment=1, win=1, sigma_psi=0.0, phase_shift=0.0, fixed_amplitude=false, fixed_phase=false, gather=true, minimize_shotnoise=false, voxel_window_correction=0)
+    # The default `rfftplan` is only reachable for a non-distributed array: a
+    # PencilArray has to be allocated from its plan, so that path passes one in.
+    nxyz = size_global(deltar)
     nx, ny, nz = nxyz
     Lx, Ly, Lz = Lxyz
     Volume = Lx * Ly * Lz
@@ -588,11 +705,13 @@ function simulate_galaxies(nxyz, Lxyz, nbar, pk, b, faH; rfftplan=default_plan(n
     kF = 2*π ./ Lxyz
 
     println("Draw random phases...")
-    @time deltakm = draw_phases(rfftplan; rng)
+    @time deltakm = draw_phases(rfftplan; rng, deltar)
+    T = real(eltype(deltakm))
     @time set_fixed_phase!(deltakm, fixed_phase)
     if phase_shift != 0
         # exp(im*π) does not specialize for irrational
-        @time @strided deltakm .*= cos(phase_shift) + im * sin(phase_shift)
+        exp_phase_shift = complex(T)(cos(phase_shift) + im * sin(phase_shift))  # hoisted, see src/arrays.jl
+        @time @strided deltakm .*= exp_phase_shift
     end
     if fixed_amplitude
         @strided @. deltakm /= abs(deltakm)
@@ -608,8 +727,9 @@ function simulate_galaxies(nxyz, Lxyz, nbar, pk, b, faH; rfftplan=default_plan(n
     @time deltarg = rfftplan \ deltakg
     #@show get_rank(),"interim",deltarm[1,1,1],mean(deltakm)
     #@show get_rank(),"interim",deltarg[1,1,1],mean(deltakg)
-    @time @strided @. deltarm *= (nx*ny*nz) / Volume
-    @time @strided @. deltarg *= (nx*ny*nz) / Volume
+    ncells_over_volume = T((nx*ny*nz) / Volume)
+    @time @strided @. deltarm *= ncells_over_volume
+    @time @strided @. deltarg *= ncells_over_volume
     #@show get_rank(),deltarm[1,1,1],mean(deltakm)
     #@show get_rank(),deltarg[1,1,1],mean(deltakg)
     # @show mean(deltarm),std(deltarm)
@@ -726,7 +846,10 @@ function simulate_galaxies(nxyz, Lxyz, nbar, pk, b, faH; rfftplan=default_plan(n
     Ncells = prod(size_global(deltarg))
     Navg = nbar * prod(Δx)
     Ngalaxies = Navg * Ncells * mean_global(win)
-    @time xyzv = draw_galaxies_with_velocities(deltarg, vx, vy, vz, Navg, Ngalaxies, Δx, Val(do_rsd), Val(voxel_window_power), Val(velocity_assignment); rng, minimize_shotnoise)
+    # Drawing galaxies is inherently serial -- Poisson sampling per cell into a
+    # buffer that grows -- and reads the fields cell by cell, so it stays on the
+    # host. to_host() is a no-op for arrays that are already there.
+    @time xyzv = draw_galaxies_with_velocities(to_host(deltarg), to_host(vx), to_host(vy), to_host(vz), Navg, Ngalaxies, Δx, Val(do_rsd), Val(voxel_window_power), Val(velocity_assignment); rng, minimize_shotnoise)
 
     # FoG: sigma_u = f * sigma_psi
     if sigma_psi != 0
@@ -749,17 +872,54 @@ function simulate_galaxies(nxyz, Lxyz, nbar, pk, b, faH; rfftplan=default_plan(n
 end
 
 
+# Mesh-size interface: allocate the noise from the plan, then call the core.
+# `rng` is consumed here, in the same order `draw_phases()` used to consume it.
+function simulate_galaxies(nxyz, Lxyz, nbar, pk, b, faH;
+        rfftplan=default_plan(nxyz), rng=Random.GLOBAL_RNG, deltar=nothing, kwargs...)
+    if isnothing(deltar)
+        deltar = allocate_input(rfftplan)
+        randn!(rng, parent(deltar))
+    elseif Tuple(size_global(deltar)) != Tuple(nxyz)
+        throw(DimensionMismatch(
+            "deltar has global size $(Tuple(size_global(deltar))), but nmesh asks for $(Tuple(nxyz))"))
+    end
+
+    return simulate_galaxies(deltar, Lxyz, nbar, pk, b, faH; rfftplan, rng, kwargs...)
+end
+
+
 @doc raw"""
     simulate_galaxies(nbar, Lbox, pk; nmesh=256, bias=1.0, f=false,
-        rfftplanner=default_plan, rng=Random.GLOBAL_RNG, voxel_window_power=1,
-        velocity_assignment=1, win=1, sigma_psi=0.0, phase_shift=0.0,
-        fixed_amplitude=false, fixed_phase=false, gather=true,
+        rfftplanner=default_plan, T=Float64, rng=Random.GLOBAL_RNG,
+        voxel_window_power=1, velocity_assignment=1, win=1, sigma_psi=0.0,
+        phase_shift=0.0, fixed_amplitude=false, fixed_phase=false, gather=true,
         minimize_shotnoise=false)
 
 Simulate galaxies using log-normal statistics.
+
+`T` selects the floating point type of the density and velocity fields, and
+hence of the returned positions and velocities. It is forwarded to
+`rfftplanner`, which may also be given a ready-made plan instead. Note that
+`Float32` resolves a 1 Gpc box to only ~6e-5 Mpc.
+
+`deltar` supplies the white noise itself. It is used as given, never drawn
+into, so it must already be filled; and since every other array is derived from
+it, passing one selects the element type *and* the array type of the whole
+simulation. So to run on an Apple GPU, which has no `Float64` at all:
+
+```julia
+using Metal
+simulate_galaxies(nbar, Lbox, pk; nmesh, deltar=MtlArray(randn(Float32, nmesh, nmesh, nmesh)))
+```
+
+This bypasses `rng`, which then only affects the Poisson sampling; leave
+`deltar` out to have the noise drawn from `rng` as usual.
+
+Drawing the galaxies themselves is serial and always runs on the CPU; the
+fields are copied back for it.
 """
 function simulate_galaxies(nbar, Lbox, pk; nmesh=256, bias=1.0, f=false,
-        rfftplanner=default_plan, kwargs...)
+        rfftplanner=default_plan, T=Float64, deltar=nothing, kwargs...)
 
     if nmesh isa Number
         nxyz = nmesh, nmesh, nmesh
@@ -773,16 +933,22 @@ function simulate_galaxies(nbar, Lbox, pk; nmesh=256, bias=1.0, f=false,
         Lxyz = Lbox
     end
 
-    @time if rfftplanner isa Function
-        rfftplan = rfftplanner(nxyz)
+    # A named planner wins, and is the only way to get a distributed run, since
+    # PencilFFTs builds the plan before it can allocate a matching input.
+    # Otherwise `deltar` supplies both element type and backend, which is what
+    # makes running elsewhere a single keyword.
+    @time rfftplan = if isnothing(deltar) || rfftplanner !== default_plan
+        make_rfftplan(rfftplanner, nxyz, T)
     else
-        rfftplan = rfftplanner
+        plan_rfft(deltar)
     end
 
     @time xyzv = simulate_galaxies(nxyz, Lxyz, nbar, pk, bias, f;
-                                   rfftplan, kwargs...)
+                                   rfftplan, deltar, kwargs...)
     println("Post-processing...")
-    @time xyz = @. xyzv[1:3,:] - Lbox / 2
+    # narrowed so that this allocating broadcast cannot promote xyz back to Float64
+    box_shift = real(eltype(xyzv)).(Lbox ./ 2)
+    @time xyz = @. xyzv[1:3,:] - box_shift
     @time v = xyzv[4:6,:]
 
     return collect(xyz), collect(v)

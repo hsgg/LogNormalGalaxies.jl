@@ -17,9 +17,28 @@ using BenchmarkTools
 using PkSpectra
 
 
+# Run a subset of the suite by name, e.g.
+#     julia --project -e 'using Pkg; Pkg.test(test_args=["reproducibility"])'
+# With no arguments the whole suite runs.
+selected(name) = isempty(ARGS) || name in ARGS
+
+include("testutils.jl")
+
+
 @testset verbose=true "LogNormalGalaxies" begin
 
-    @testset "Compile and load $rfftplanner" for rfftplanner=[LogNormalGalaxies.plan_with_fftw,LogNormalGalaxies.plan_with_pencilffts]
+    selected("reproducibility") && include("reproducibility.jl")
+    selected("float32") && include("float32.jl")
+
+    # GPU tests are opt-in. CI is ubuntu-latest/x64, and GitHub's macOS runners
+    # have no usable Metal GPU either, so this only ever runs on a developer
+    # machine. `using` cannot appear inside an `if`, hence the guarded include.
+    if selected("metal") && Sys.isapple() && Sys.ARCH == :aarch64 &&
+            get(ENV, "LNG_TEST_GPU", "0") == "1"
+        include("metal.jl")
+    end
+
+    selected("compile") && @testset "Compile and load $rfftplanner" for rfftplanner=[LogNormalGalaxies.plan_with_fftw,LogNormalGalaxies.plan_with_pencilffts]
         @show rfftplanner
         if Sys.ARCH == :aarch64 && rfftplanner == LogNormalGalaxies.plan_with_pencilffts
             @test_skip "Skipping PencilFFTs on ARM64"
@@ -43,12 +62,15 @@ using PkSpectra
         # generate catalog
         @time x⃗, Ψ = simulate_galaxies(nbar, L+ΔL, pk; nmesh=n, bias, f=1, rfftplanner)
         @show size(x⃗), size(Ψ)
+        # Float64 is still the default; see float32.jl for the general case.
         @test typeof(x⃗) <: Array{Float64}
         @test typeof(Ψ) <: Array{Float64}
+        @test typeof(x⃗) <: Array{<:AbstractFloat}
+        @test typeof(Ψ) <: Array{<:AbstractFloat}
     end
 
 
-    @testset "Random phases" begin
+    selected("phases") && @testset "Random phases" begin
         function create_randn(n, rfftplanner)
             rfftplan = rfftplanner([n,n,n])
             deltar = LogNormalGalaxies.allocate_input(rfftplan)
@@ -70,7 +92,67 @@ using PkSpectra
     end
 
 
-    @testset "pk_to_pkG(D²=$D²)" for D²=[0.1,1.0]
+    # The k-space operations are one broadcast for every backend now, and a
+    # PencilArray broadcasts in *memory* order, so `broadcast_dim()` has to place
+    # each factor at its permuted axis. Nothing else checks that: run identical
+    # noise through both backends and demand the same field. Single-rank -- all
+    # `Pkg.test` gives us -- but a single rank already carries a
+    # Permutation(3,2,1), which is the part that needs checking. Multi-rank
+    # local ranges remain untested. (Hence also no ARM64 skip here.)
+    selected("pencil_kspace") && @testset "PencilFFTs matches FFTW in k-space" begin
+        begin
+            n = 16
+            nxyz = (n, n, n)
+            L = 100.0
+            kF = (2π / L) .* (1, 1, 1)
+            Volume = L^3
+
+            keq = 2e-2
+            pkfn(k) = 2e4 * 4 * keq^3 * k / (3 * keq^4 + k^4)
+            pk1d = pkfn.((2π / L) .* (0:(n - 1)))
+
+            noise = randn(StableRNG(4711), nxyz...)
+
+            # A host array in logical index order, for both array types.
+            # `CartesianIndices(::PencilArray)` yields logical indices but
+            # *iterates* in memory order, so a comprehension over it would come
+            # out permuted; hence the explicit loops. Single-rank only.
+            to_plain(u) = [u[i,j,k] for i in axes(u,1), j in axes(u,2), k in axes(u,3)]
+
+            function kspace_field(rfftplanner, op!)
+                rfftplan = rfftplanner(nxyz)
+                deltar = LogNormalGalaxies.allocate_input(rfftplan)
+                for I in CartesianIndices(deltar)
+                    deltar[I] = noise[I]
+                end
+                deltak = LogNormalGalaxies.draw_phases(rfftplan; deltar)
+                return to_plain(op!(deltak, rfftplan))
+            end
+
+            @testset "$name" for (name, op!) in [
+                    "draw_phases" =>
+                        (dk, p) -> dk,
+                    "pixel_window!" =>
+                        (dk, p) -> LogNormalGalaxies.pixel_window!(dk, nxyz; voxel_window_correction=1),
+                    "calc_velocity_component!" =>
+                        (dk, p) -> LogNormalGalaxies.calc_velocity_component!(dk, kF, 2),
+                    "scale_by_pk!(callable)" =>
+                        (dk, p) -> LogNormalGalaxies.scale_by_pk!(dk, pkfn, 1.5, kF, Volume; rfftplan=p),
+                    "scale_by_pk!(array)" =>
+                        (dk, p) -> LogNormalGalaxies.scale_by_pk!(dk, pk1d, 1.5, kF, Volume; rfftplan=p),
+                ]
+                a = kspace_field(LogNormalGalaxies.plan_with_fftw, op!)
+                b = kspace_field(LogNormalGalaxies.plan_with_pencilffts, op!)
+                @test size(a) == size(b)
+                @test all(isfinite, a)
+                # both call FFTW on the same noise: reassociation apart only
+                @test a ≈ b rtol=1e-10
+            end
+        end
+    end
+
+
+    selected("pk_to_pkG") && @testset "pk_to_pkG(D²=$D²)" for D²=[0.1,1.0]
         @show D²
         data = readdlm((@__DIR__)*"/matterpower.dat", comments=true)
         println("data read")
@@ -85,7 +167,7 @@ using PkSpectra
     end
 
 
-    @testset "Zero pk" begin
+    selected("zero_pk") && @testset "Zero pk" begin
         pk(k) = 0.0
         #k, pkG = LogNormalGalaxies.pk_to_pkG(pk)
         k = 10.0 .^ (-3:0.01:0)
@@ -103,7 +185,7 @@ using PkSpectra
     end
 
 
-    @testset "Cutoff pk" begin
+    selected("cutoff_pk") && @testset "Cutoff pk" begin
         data = readdlm((@__DIR__)*"/matterpower.dat", comments=true)
         _pk = Spline1D(data[:,1], data[:,2], extrapolation=MySplines.powerlaw)
         k0 = 5e-2
@@ -113,7 +195,7 @@ using PkSpectra
     end
 
 
-    @testset "draw_galaxies_with_velocities()" begin
+    selected("draw_galaxies") && @testset "draw_galaxies_with_velocities()" begin
         # The function 'draw_galaxies_with_velocities()' is a performance bottleneck.
         nnn = 128, 128, 128
         deltar = randn(nnn...)
@@ -130,7 +212,7 @@ using PkSpectra
     end
 
 
-    @testset "Array deepcopy" begin
+    selected("deepcopy") && @testset "Array deepcopy" begin
         nxyz = (2, 2, 2)
         rfftplan = LogNormalGalaxies.plan_with_pencilffts(nxyz)
         x = LogNormalGalaxies.allocate_input(rfftplan)
@@ -141,7 +223,7 @@ using PkSpectra
     end
 
 
-    @testset verbose=true "Any spline" begin
+    selected("any_spline") && @testset verbose=true "Any spline" begin
         println("Test any typed spline:")
         # Someone may give other data types than Float64 to the module. Let's be
         # able to handle that.
@@ -172,7 +254,7 @@ using PkSpectra
     end
 
 
-    @testset "3D-Array pk" begin
+    selected("array_pk") && @testset "3D-Array pk" begin
         println("Test array typed pk:")
         nbar = 3e-4
         L = 100.0
@@ -188,7 +270,7 @@ using PkSpectra
     end
 
 
-    @testset "2D-Array pk" begin
+    selected("array_pk") && @testset "2D-Array pk" begin
         println("Test array typed pk:")
         nbar = 3e-4
         L = 100.0
@@ -205,7 +287,7 @@ using PkSpectra
     end
 
 
-    @testset "1D-Array pk" begin
+    selected("array_pk") && @testset "1D-Array pk" begin
         println("Test array typed pk:")
         nbar = 3e-4
         L = 100.0
@@ -221,68 +303,15 @@ using PkSpectra
     end
 
 
-    @testset "Reproducibility, (rsd, vox_corr)=($rsd, $voxel_window_correction)" for (rsd, voxel_window_correction)=[
-            (false, 0),
-            (false, 1),
-            (true, 0),
-            (true, 1),
-            ]
-        nbar = 1e-8
-        L = 1e3
-        nmesh = 32
-        bias = 1.5
-
-        keq = 2e-2
-        c = 3 * keq^4
-        a = 2e4 * 4 * keq^3
-        pk(k) = a * k / (c + k^4)
-
-        # Create separate random number generator, because task creation also uses
-        # the global RNG, so using that depends on the task-creation scheme.
-        #rng = Random.Xoshiro()  # not stable across Julia versions
-        rng = StableRNG(981670238674)
-
-        if voxel_window_correction == 0
-            x⃗old = Float64[-335.9692397515812 -157.67807790772844 -72.68579550665544 -269.6279704155078 -491.17708179876234 -365.72719760869035 -224.59392943221292 -95.4013877730365 345.3605001013826 -226.13352716021592 117.6963824483073 93.71545127205661; -180.8600883273986 220.7798770583439 109.99973965725985 -244.36442326834518 -201.83880847661288 453.6280628916106 235.70606340167456 453.34764628135554 -356.39776839402646 -263.5108300272305 -274.49624776463884 347.296242103321; -377.20300791807426 -265.12202516834606 -156.12206587366097 -36.14651372879746 -33.719191328648435 -60.55004264254137 53.63170729565536 42.4431323030625 133.39265941194697 181.867222289673 497.4939329019023 481.6793904866439]
-        elseif voxel_window_correction == 1
-            x⃗old = Float64[-335.9692397515812 -157.67807790772844 -144.62797041550778 -366.17708179876234 -240.72719760869035 -99.59392943221292 29.598612226963496 470.3605001013826 -101.13352716021592 -466.2116523354292 117.6963824483073 93.71545127205661; -180.8600883273986 220.7798770583439 -244.36442326834518 -201.83880847661288 453.6280628916106 235.70606340167456 453.34764628135554 -356.39776839402646 -263.5108300272305 -445.5215968687464 -274.49624776463884 347.296242103321; -377.20300791807426 -265.12202516834606 -36.14651372879746 -33.719191328648435 -60.55004264254137 53.63170729565536 42.4431323030625 133.39265941194697 181.867222289673 253.78973036577008 497.4939329019023 481.6793904866439]
-        end
-        if rsd
-            if voxel_window_correction == 0
-                # Ψold = Float64[-3.6046158060568043 -1.2473745889669638 -0.5267783512164292 7.559762043549412 -2.2893585427941026 -4.109193450538838 -2.391853412800177 0.3292149097252126 -1.48609726716212 2.141554349879806 -2.706566703856816 -5.4986996776576795; 1.1556700567515272 -5.386680707657309 -0.29200492354859553 0.4961305897075565 3.9457922088356314 -4.4949924227674884 0.5157226080949375 -2.6783119499320387 -3.4522859920956344 2.060164626729195 0.4898185766272014 1.494258898730236; 4.146205213131446 -1.239451327305363 -4.625577225978314 -1.5716119688975145 -9.7564603786325 5.3319551731469925 5.484297450308572 -0.551959727063615 3.453837888093186 0.48423961453566144 2.154348830736598 -1.2155629198989812]
-                Ψold = Float64[-3.6045840198752472 -1.2473635893827395 -0.5267737059856432 7.559695380142889 -2.289338354798983 -4.109157214896512 -2.391832320985978 0.3292120066460913 -1.4860841624763261 2.1415354652499206 -2.706542836841505 -5.498651189087557; 1.1556598658351513 -5.386633206891577 -0.2920023485941454 0.4961262147345087 3.945757414096252 -4.494952785077113 0.5157180603557805 -2.6782883320724684 -3.4522555491870874 2.060146459809227 0.48981425731467376 1.494245722073638; 4.146168651112423 -1.2394403975899562 -4.625536436766531 -1.5715981101269614 -9.756374344326037 5.3319081549613365 5.484249088740005 -0.5519548597787105 3.4538074314997282 0.484235344419471 2.1543298332825676 -1.215552200836052]
-            elseif voxel_window_correction == 1
-                Ψold = Float64[-3.8603473707890594 -1.7508080868525395 3.82999374399128 -1.3433971590211649 1.0850007733078857 -0.5022740681595994 0.5525993825567 1.6875045354606901 5.217397714453281 -0.5403534791970414 -2.56399384948034 -5.346501877381746; 0.8147704376278706 -5.368876297534993 0.12958941545807234 2.4774901962000544 -0.7387461517564153 3.6128044597184585 -6.891580100289248 -3.8392462652653565 -1.6207196009761853 -2.542674048079797 0.5991977290140715 1.5566270098179575; 4.549330597701409 -1.7254383824151625 -2.093108442862153 0.8076046635040561 3.3822752052414495 3.842787418655281 -2.025046575022788 -4.360334471363137 -0.9351257520416874 4.888745384237081 2.22997590648224 -0.9049424827039834]
-            end
-        else
-            Ψold = fill(Float64(0), size(x⃗old))
-        end
-
-        @time x⃗, Ψ = simulate_galaxies(nbar, L, pk; nmesh, bias, f=rsd, rng, voxel_window_power=1, velocity_assignment=0, sigma_psi=0, voxel_window_correction)
-        x⃗ = LogNormalGalaxies.concatenate_mpi_arr(x⃗)
-        Ψ = LogNormalGalaxies.concatenate_mpi_arr(Ψ)
-
-        @show size(x⃗) size(Ψ) x⃗ x⃗old Ψ Ψold
-        @show x⃗[:,2]
-        @show Ψ[:,2]
-        @test size(x⃗) == size(x⃗old)
-        @test size(Ψ) == size(Ψold)
-
-        for i=1:size(x⃗,2)
-            @test x⃗[:,i] ≈ x⃗old[:,i]  rtol=eps(Float32(L/2))
-            @test Ψ[:,i] ≈ Ψold[:,i]  rtol=eps(10f0)
-        end
-    end
-
-
-    include("apply_rsd.jl")
-    include("iterate_kspace.jl")
+    selected("apply_rsd") && include("apply_rsd.jl")
+    selected("iterate_kspace") && include("iterate_kspace.jl")
+    selected("pencil_arraytype") && include("pencil_arraytype.jl")
 
 
     ## This meant to be used more interactively:
     #include("lognormals_50sims.jl")
 
-    @testset "example.jl" begin
+    selected("example") && @testset "example.jl" begin
         include("example.jl")
     end
 
