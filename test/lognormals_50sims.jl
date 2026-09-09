@@ -244,11 +244,7 @@ end # module
 
 lognormals.main("sims_fftw", LogNormalGalaxies.plan_with_fftw)
 
-if Sys.ARCH == :aarch64
-    @test_skip "Skipping PencilFFTs on ARM64"
-else
-    lognormals.main("sims_pencilffts", LogNormalGalaxies.plan_with_pencilffts)
-end
+lognormals.main("sims_pencilffts", LogNormalGalaxies.plan_with_pencilffts)
 
 
 # vim: set sw=4 et sts=4 :

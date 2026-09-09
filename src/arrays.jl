@@ -179,6 +179,15 @@ to_host(x::PencilArray) = parent(x) isa Array ? x :
 to_host(x::AbstractArray) = Array(x)
 
 
+# local_data(): the process-local block, for reductions. A PencilArray reduces
+# collectively -- `mean`/`sum`/`var`/`extrema` build a user-defined MPI.Op,
+# which aarch64 cannot do at all (JuliaParallel/MPI.jl#404) and which would
+# reduce a second time under the Allgather in `*_global()`. Everything else,
+# device arrays included, reduces where it already lives.
+local_data(x) = x
+local_data(x::PencilArray) = parent(x)
+
+
 ############### functions to extend PencilFFTs ####
 # none!
 

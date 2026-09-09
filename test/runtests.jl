@@ -40,10 +40,6 @@ include("testutils.jl")
 
     selected("compile") && @testset "Compile and load $rfftplanner" for rfftplanner=[LogNormalGalaxies.plan_with_fftw,LogNormalGalaxies.plan_with_pencilffts]
         @show rfftplanner
-        if Sys.ARCH == :aarch64 && rfftplanner == LogNormalGalaxies.plan_with_pencilffts
-            @test_skip "Skipping PencilFFTs on ARM64"
-            continue
-        end
 
         bias = 1.8
         f = 0.71
@@ -148,6 +144,35 @@ include("testutils.jl")
                 # both call FFTW on the same noise: reassociation apart only
                 @test a ≈ b rtol=1e-10
             end
+        end
+    end
+
+
+    # `mean`/`sum`/`var`/`extrema` on a PencilArray are MPI collectives building
+    # a user-defined MPI.Op, which aarch64 cannot construct at all
+    # (JuliaParallel/MPI.jl#404) and which double-counts under the Allgather in
+    # `*_global()`. Those reduce over `local_data()` instead; demand they still
+    # answer what the host array does. Single-rank -- enough for the MPI.Op
+    # failure, which is what regressed; multi-rank is the open TODO item.
+    selected("global_reductions") && @testset "*_global() matches the host array" begin
+        n = 8
+        nxyz = (n, n, n)
+        host = randn(StableRNG(4712), nxyz...)
+
+        rfftplan = LogNormalGalaxies.plan_with_pencilffts(nxyz)
+        pa = LogNormalGalaxies.allocate_input(rfftplan)
+        for I in CartesianIndices(pa)
+            pa[I] = host[I]
+        end
+
+        @testset "$name" for (name, f, ref) in [
+                ("mean_global", LogNormalGalaxies.mean_global, LogNormalGalaxies.mean(host)),
+                ("var_global", LogNormalGalaxies.var_global, LogNormalGalaxies.var(host)),
+                ("extrema_global", LogNormalGalaxies.extrema_global, extrema(host)),
+            ]
+            @test all(isfinite, f(host))
+            @test all(f(host) .≈ ref)
+            @test all(f(pa) .≈ ref)
         end
     end
 

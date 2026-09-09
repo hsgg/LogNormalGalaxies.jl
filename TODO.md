@@ -36,6 +36,16 @@ drawn into; docstring and test now pass `randn`.
 CPU runs, so the second continued the first's stream. With one each they agree
 exactly.
 
+- The ARM64 PencilFFTs skips are gone. MPI was never the problem -- MPICH_jll
+has an aarch64-apple-darwin build and an RFFT round-trip is exact on 1, 2 and 4
+ranks. What failed was `mean_global()`/`var_global()`/`extrema_global()`: a
+PencilArray reduces *collectively*, building a user-defined MPI.Op that aarch64
+cannot construct (JuliaParallel/MPI.jl#404). They reduce over `local_data()`
+now, which also fixes a multi-rank bug -- they paired a local `length(arr)` with
+an already-global `mean(arr)`, so `var_global()` rescaled a global variance.
+New testset "*_global() matches the host array".
+
+
 ## Open
 
 - Multi-rank PencilFFTs is untested. Single-rank exercises the permutation but
@@ -43,9 +53,6 @@ not the local ranges; would need an `mpiexec -n 2` harness.
 
 - scale_by_pk!(pk::AbstractArray{T,2}) sets the DC mode at the local [1,1,1],
 which is k⃗ = 0 only on one rank. Pre-existing; see the FIXME there.
-
-- The `compile` testset still skips PencilFFTs on ARM64, but single-rank works
-there now. Worth rechecking.
 
 - scale_by_pk!(array) does `√(pkG * vol)` on a complex pkG, which for a slightly
 negative pkG sits on the branch cut: FFTW and Metal then disagree by a factor
