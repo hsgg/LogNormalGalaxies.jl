@@ -150,6 +150,35 @@ selected(name) = isempty(ARGS) || name in ARGS
     end
 
 
+    # `mean`/`sum`/`var`/`extrema` on a PencilArray are MPI collectives building
+    # a user-defined MPI.Op, which aarch64 cannot construct at all
+    # (JuliaParallel/MPI.jl#404) and which double-counts under the Allgather in
+    # `*_global()`. Those reduce over `local_data()` instead; demand they still
+    # answer what the host array does. Single-rank -- enough for the MPI.Op
+    # failure, which is what regressed; multi-rank is the open TODO item.
+    selected("global_reductions") && @testset "*_global() matches the host array" begin
+        n = 8
+        nxyz = (n, n, n)
+        host = randn(StableRNG(4712), nxyz...)
+
+        rfftplan = LogNormalGalaxies.plan_with_pencilffts(nxyz)
+        pa = LogNormalGalaxies.allocate_input(rfftplan)
+        for I in CartesianIndices(pa)
+            pa[I] = host[I]
+        end
+
+        @testset "$name" for (name, f, ref) in [
+                ("mean_global", LogNormalGalaxies.mean_global, LogNormalGalaxies.mean(host)),
+                ("var_global", LogNormalGalaxies.var_global, LogNormalGalaxies.var(host)),
+                ("extrema_global", LogNormalGalaxies.extrema_global, extrema(host)),
+            ]
+            @test all(isfinite, f(host))
+            @test all(f(host) .≈ ref)
+            @test all(f(pa) .≈ ref)
+        end
+    end
+
+
     selected("pk_to_pkG") && @testset "pk_to_pkG(D²=$D²)" for D²=[0.1,1.0]
         @show D²
         data = readdlm((@__DIR__)*"/matterpower.dat", comments=true)

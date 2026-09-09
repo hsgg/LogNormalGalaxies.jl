@@ -581,9 +581,10 @@ end
 # var_global(): Calculate variance of the given array, taking care of proper
 # handling of distributed arrays such as PencilArrays.
 function var_global(arr, comm=MPI.COMM_WORLD)
-    n = length(arr)
-    μ = mean(arr)
-    v = var(arr)
+    a = local_data(arr)
+    n = length(a)
+    μ = mean(a)
+    v = var(a)
     if MPI.Initialized()
         nn = MPI.Allgather(n, comm)
         μμ = MPI.Allgather(μ, comm)
@@ -596,11 +597,16 @@ function var_global(arr, comm=MPI.COMM_WORLD)
 end
 
 
+# std_global(): as var_global(), for the diagnostic printouts.
+std_global(arr, comm=MPI.COMM_WORLD) = sqrt(var_global(arr, comm))
+
+
 # mean_global(): Calculate mean of the given array, taking care of proper
 # handling of distributed arrays such as PencilArrays.
 function mean_global(arr, comm=MPI.COMM_WORLD)
-    n = length(arr)
-    μ = mean(arr)
+    a = local_data(arr)
+    n = length(a)
+    μ = mean(a)
     if MPI.Initialized()
         nn = MPI.Allgather(n, comm)
         μμ = MPI.Allgather(μ, comm)
@@ -614,7 +620,7 @@ end
 # extrema_global(): Calculate extrema of the given array, taking care of proper
 # handling of distributed arrays such as PencilArrays.
 function extrema_global(arr, comm=MPI.COMM_WORLD)
-    lo, hi = extrema(arr)
+    lo, hi = extrema(local_data(arr))
     if MPI.Initialized()
         lolo = MPI.Allgather(lo, comm)
         hihi = MPI.Allgather(hi, comm)
@@ -732,10 +738,10 @@ function simulate_galaxies(deltar::AbstractArray{<:Real,3}, Lxyz, nbar, pk, b, f
     @time @strided @. deltarg *= ncells_over_volume
     #@show get_rank(),deltarm[1,1,1],mean(deltakm)
     #@show get_rank(),deltarg[1,1,1],mean(deltakg)
-    # @show mean(deltarm),std(deltarm)
-    # @show extrema(deltarm)
-    # @show mean(deltarg),std(deltarg)
-    # @show extrema(deltarg)
+    # @show mean_global(deltarm),std_global(deltarm)
+    # @show extrema_global(deltarm)
+    # @show mean_global(deltarg),std_global(deltarg)
+    # @show extrema_global(deltarg)
 
     println("Transform G → δ...")
     # @time σGm² = var_global(deltarm)
@@ -752,7 +758,7 @@ function simulate_galaxies(deltar::AbstractArray{<:Real,3}, Lxyz, nbar, pk, b, f
     # non-allocating version of <e^G>
     @time @strided @. deltarm = exp(deltarm)
     # @show mean_global(deltarm), var_global(deltarm)
-    # @show extrema(deltarm),deltarm[1,1,1]
+    # @show extrema_global(deltarm),deltarm[1,1,1]
     @time mean_expGm = 1 / mean_global(deltarm)
     @time @strided @. deltarm = deltarm * mean_expGm - 1
 
@@ -766,24 +772,24 @@ function simulate_galaxies(deltar::AbstractArray{<:Real,3}, Lxyz, nbar, pk, b, f
     # @assert all(isfinite.(deltarg))
 
     #@show σGm² σGg²
-    @show mean(deltarm),std(deltarm)
-    @show extrema(deltarm)
-    @show mean(deltarg),std(deltarg)
-    @show extrema(deltarg)
+    @show mean_global(deltarm),std_global(deltarm)
+    @show extrema_global(deltarm)
+    @show mean_global(deltarg),std_global(deltarg)
+    @show extrema_global(deltarg)
 
 
     false && if phase_shift != 0
         println("Inverting deltarg...")
         @. deltarm = 1 / (1 + deltarm) - 1
         @. deltarg = 1 / (1 + deltarg) - 1
-        @show mean(deltarg),std(deltarg)
-        @show extrema(deltarg)
+        @show mean_global(deltarg),std_global(deltarg)
+        @show extrema_global(deltarg)
         mean_1pdeltarm = mean_global(@. 1 + deltarm)
         mean_1pdeltarg = mean_global(@. 1 + deltarg)
         @. deltarm = @. (1 + deltarm) / mean_1pdeltarm - 1
         @. deltarg = @. (1 + deltarg) / mean_1pdeltarg - 1
-        @show mean(deltarg),std(deltarg)
-        @show extrema(deltarg)
+        @show mean_global(deltarg),std_global(deltarg)
+        @show extrema_global(deltarg)
     end
 
     # correct pixel window in k-space
@@ -794,8 +800,8 @@ function simulate_galaxies(deltar::AbstractArray{<:Real,3}, Lxyz, nbar, pk, b, f
         @time mul!(deltakg, rfftplan, deltarg)
         @time pixel_window!(deltakg, nxyz; voxel_window_correction)
         @time deltarg = rfftplan \ deltakg
-        @show mean(deltarg),std(deltarg)
-        @show extrema(deltarg)
+        @show mean_global(deltarg),std_global(deltarg)
+        @show extrema_global(deltarg)
     end
     deltakg = nothing
 
